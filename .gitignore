@@ -32,6 +32,8 @@ yarn-error.*
 
 # local env files
 .env*.local
+server/.env
+server/data/
 
 # typescript
 *.tsbuildinfo
@@ -39,3 +41,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# personal local Claude Code settings (machine-specific approvals)
+.claude/settings.local.json

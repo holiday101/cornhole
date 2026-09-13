@@ -1,0 +1,301 @@
+import { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import Screen from '../components/Screen';
+import PrimaryButton from '../components/PrimaryButton';
+import { colors, radius, spacing, typography } from '../theme';
+import { getGame } from '../api/games';
+import { summarizeBeans, totalScore } from '../logic/beans';
+
+const BEAN_COLUMNS = [
+  { key: 'longestDrive', label: 'Drive' },
+  { key: 'closestRegulation', label: 'CIR' },
+  { key: 'onePutt', label: '1-Putt' },
+  { key: 'holeWinner', label: 'Holes' },
+];
+
+export default function GameSummaryScreen({ route, navigation }) {
+  const { gameId } = route.params;
+  const [game, setGame] = useState(null);
+  const [playerMap, setPlayerMap] = useState({});
+
+  useEffect(() => {
+    getGame(gameId)
+      .then(({ game: loadedGame }) => {
+        const map = {};
+        loadedGame.players.forEach((p) => (map[p.id] = p.name));
+        setGame(loadedGame);
+        setPlayerMap(map);
+      })
+      .catch(() => navigation.goBack());
+  }, [gameId]);
+
+  if (!game) {
+    return (
+      <Screen>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </Screen>
+    );
+  }
+
+  const { totals, breakdown, holeWinners } = summarizeBeans(game);
+
+  const leaderboard = game.playerIds
+    .map((pid) => ({
+      id: pid,
+      name: playerMap[pid] || 'Unknown',
+      strokes: totalScore(game.holes, pid),
+      beans: totals[pid] || 0,
+    }))
+    .sort((a, b) => a.strokes - b.strokes);
+
+  const dateLabel = new Date(game.date).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  return (
+    <Screen>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={[typography.title, styles.title]}>Round Summary</Text>
+        <Text style={styles.meta}>
+          {dateLabel} · {game.holesCount} holes · {game.playerIds.length} players
+        </Text>
+
+        <Text style={[typography.label, styles.sectionLabel]}>LEADERBOARD (STROKES)</Text>
+        <View style={styles.card}>
+          {leaderboard.map((p, i) => (
+            <View key={p.id} style={[styles.leaderRow, i === 0 && styles.leaderRowFirst]}>
+              <Text style={styles.rank}>{i + 1}</Text>
+              <Text style={styles.leaderName}>{p.name}</Text>
+              <Text style={styles.leaderStrokes}>{p.strokes}</Text>
+              <Text style={styles.leaderBeans}>🫘 {p.beans}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={[typography.label, styles.sectionLabel]}>BEAN BREAKDOWN</Text>
+        <View style={styles.card}>
+          <View style={styles.tableHeaderRow}>
+            <Text style={[styles.tableCell, styles.tableNameCell, styles.tableHeaderText]}>
+              Player
+            </Text>
+            {BEAN_COLUMNS.map((col) => (
+              <Text key={col.key} style={[styles.tableCell, styles.tableHeaderText]}>
+                {col.label}
+              </Text>
+            ))}
+            <Text style={[styles.tableCell, styles.tableHeaderText]}>Total</Text>
+          </View>
+          {game.playerIds.map((pid) => (
+            <View key={pid} style={styles.tableRow}>
+              <Text style={[styles.tableCell, styles.tableNameCell]} numberOfLines={1}>
+                {playerMap[pid] || 'Unknown'}
+              </Text>
+              {BEAN_COLUMNS.map((col) => (
+                <Text key={col.key} style={styles.tableCell}>
+                  {breakdown[pid]?.[col.key] ?? 0}
+                </Text>
+              ))}
+              <Text style={[styles.tableCell, styles.tableTotalText]}>{totals[pid] || 0}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={[typography.label, styles.sectionLabel]}>HOLE BY HOLE</Text>
+        <View style={styles.card}>
+          {game.holes.map((hole, i) => {
+            const result = holeWinners[i];
+            return (
+              <View
+                key={hole.holeNumber}
+                style={[styles.holeRow, i === 0 && styles.holeRowFirst]}
+              >
+                <View style={styles.holeRowHeader}>
+                  <Text style={styles.holeRowTitle}>
+                    Hole {hole.holeNumber}
+                    {hole.par ? ` · Par ${hole.par}` : ''}
+                  </Text>
+                  {result.resolved && result.winnerId && (
+                    <Text style={styles.holeRowWinner}>
+                      🏆 {playerMap[result.winnerId]}
+                    </Text>
+                  )}
+                  {result.resolved && result.tied && (
+                    <Text style={styles.holeRowTied}>Tied</Text>
+                  )}
+                </View>
+                <View style={styles.holePlayersRow}>
+                  {game.playerIds.map((pid) => (
+                    <View key={pid} style={styles.holePlayerCell}>
+                      <Text style={styles.holePlayerName} numberOfLines={1}>
+                        {playerMap[pid] || 'Unknown'}
+                      </Text>
+                      <Text style={styles.holePlayerScore}>{hole.scores[pid] ?? '–'}</Text>
+                      <Text style={styles.holeBeanIcons}>
+                        {hole.beans.longestDrive === pid ? '🚗 ' : ''}
+                        {hole.beans.closestRegulation === pid ? '🎯 ' : ''}
+                        {hole.beans.onePutt === pid ? '⛳' : ''}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={{ height: spacing.md }} />
+      </ScrollView>
+
+      <PrimaryButton title="Back to Home" onPress={() => navigation.popToTop()} style={styles.doneBtn} />
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  loadingText: {
+    color: colors.textMuted,
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+  },
+  title: {
+    marginTop: spacing.md,
+  },
+  meta: {
+    color: colors.textMuted,
+    fontSize: 14,
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
+  },
+  sectionLabel: {
+    marginBottom: spacing.sm,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  leaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  leaderRowFirst: {
+    borderTopWidth: 0,
+  },
+  rank: {
+    width: 24,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  leaderName: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  leaderStrokes: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+    marginRight: spacing.md,
+  },
+  leaderBeans: {
+    fontSize: 15,
+    color: colors.textMuted,
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: spacing.xs,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: spacing.sm,
+  },
+  tableCell: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  tableNameCell: {
+    flex: 1.6,
+    textAlign: 'left',
+    fontWeight: '600',
+  },
+  tableHeaderText: {
+    color: colors.textMuted,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  tableTotalText: {
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  doneBtn: {
+    marginBottom: spacing.md,
+  },
+  holeRow: {
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  holeRowFirst: {
+    borderTopWidth: 0,
+  },
+  holeRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  holeRowTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  holeRowWinner: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  holeRowTied: {
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  holePlayersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  holePlayerCell: {
+    width: '50%',
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  holePlayerName: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  holePlayerScore: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    marginRight: spacing.xs,
+    marginLeft: spacing.xs,
+  },
+  holeBeanIcons: {
+    fontSize: 12,
+    width: 44,
+  },
+});
