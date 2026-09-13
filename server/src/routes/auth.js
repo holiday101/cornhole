@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const { requireAuth, hashToken } = require('../middleware/auth');
+const { resolvePendingInvites } = require('./contacts');
 
 const router = express.Router();
 
@@ -68,6 +69,7 @@ router.post('/auth/signup', signupLimiter, (req, res) => {
     .run(normalizedEmail, passwordHash, name.trim());
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
+  resolvePendingInvites(user);
   const token = createSession(user.id);
   res.status(201).json({ token, user: toPublicUser(user) });
 });

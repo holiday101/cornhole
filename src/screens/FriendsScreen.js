@@ -11,6 +11,7 @@ export default function FriendsScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
@@ -34,11 +35,16 @@ export default function FriendsScreen({ navigation }) {
     const trimmed = email.trim();
     if (!trimmed) return;
     setError('');
+    setInfo('');
     setAdding(true);
     try {
-      await addContact(trimmed);
+      const result = await addContact(trimmed);
       setEmail('');
-      await load();
+      if (result && result.invitedEmail) {
+        setInfo(`Invite sent to ${result.invitedEmail} — they'll show up here once they sign up.`);
+      } else {
+        await load();
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not add that friend.');
     } finally {
@@ -76,6 +82,7 @@ export default function FriendsScreen({ navigation }) {
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {info ? <Text style={styles.infoText}>{info}</Text> : null}
 
         <FlatList
           data={contacts}
@@ -147,6 +154,11 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: colors.danger,
+    fontSize: 14,
+    marginBottom: spacing.sm,
+  },
+  infoText: {
+    color: colors.primary,
     fontSize: 14,
     marginBottom: spacing.sm,
   },

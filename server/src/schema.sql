@@ -16,6 +16,16 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
+-- someone tried to add a friend by email before that person had an
+-- account; resolved (and deleted) the moment that email signs up.
+CREATE TABLE IF NOT EXISTS pending_invites (
+  email TEXT NOT NULL,
+  invited_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (email, invited_by_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pending_invites_email ON pending_invites(email);
+
 -- symmetric relationship: always stored with user_a_id < user_b_id
 CREATE TABLE IF NOT EXISTS contacts (
   user_a_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
