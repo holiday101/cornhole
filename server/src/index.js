@@ -6,6 +6,13 @@ const coursesRoutes = require('./routes/courses');
 const gamesRoutes = require('./routes/games');
 
 const app = express();
+
+// The API runs behind nginx on the EC2 box (membergolfonline.com/cornhole/api
+// proxies to this process), so Express needs to trust the first hop's
+// X-Forwarded-For to see the real client IP. Without this, express-rate-limit
+// would bucket every request under nginx's own IP.
+app.set('trust proxy', 1);
+
 app.use(express.json());
 
 app.use(authRoutes);

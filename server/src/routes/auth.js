@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const { requireAuth, hashToken } = require('../middleware/auth');
 
@@ -8,6 +9,28 @@ const router = express.Router();
 
 const SESSION_TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 30);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Login: keyed by IP + the email being attempted, so one person mistyping
+// their own password repeatedly doesn't get everyone else on the same IP
+// (e.g. a shared wifi at the course) rate-limited too, while still stopping
+// a single attacker from hammering one account or spraying many.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${(req.body && req.body.email) || ''}`.toLowerCase(),
+  message: { error: 'Too many login attempts. Please wait a few minutes and try again.' },
+});
+
+// Signup: keyed by IP only, since there's no existing account to key against.
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many accounts created from this network. Please try again later.' },
+});
 
 function toPublicUser(user) {
   return { id: user.id, email: user.email, name: user.name };
@@ -23,7 +46,7 @@ function createSession(userId) {
   return token;
 }
 
-router.post('/auth/signup', (req, res) => {
+router.post('/auth/signup', signupLimiter, (req, res) => {
   const { email, password, name } = req.body || {};
   if (typeof email !== 'string' || !EMAIL_RE.test(email)) {
     return res.status(400).json({ error: 'Valid email is required' });
@@ -49,7 +72,7 @@ router.post('/auth/signup', (req, res) => {
   res.status(201).json({ token, user: toPublicUser(user) });
 });
 
-router.post('/auth/login', (req, res) => {
+router.post('/auth/login', loginLimiter, (req, res) => {
   const { email, password } = req.body || {};
   if (typeof email !== 'string' || typeof password !== 'string') {
     return res.status(400).json({ error: 'Email and password are required' });
