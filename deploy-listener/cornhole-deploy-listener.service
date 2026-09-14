@@ -1,0 +1,15 @@
+[Unit]
+Description=Cornhole Golf deploy listener
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+EnvironmentFile=/home/ubuntu/cornhole-deploy-listener.env
+ExecStart=/usr/bin/node /home/ubuntu/cornhole-deploy-listener/listener.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -44,3 +44,6 @@ server/data/
 
 # personal local Claude Code settings (machine-specific approvals)
 .claude/settings.local.json
+
+# deploy webhook secret (never commit)
+deploy-listener/.token
