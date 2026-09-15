@@ -11,14 +11,25 @@ import {
   getGame,
   adjustScore,
   setBean as setBeanApi,
+  setCoin,
+  setPosition as setPositionApi,
   setCompleted,
 } from '../api/games';
 import { computeHoleWinners } from '../logic/beans';
+import { computeCoinHolders, POSITIVE_COINS, NEGATIVE_COINS } from '../logic/coins';
+import { computeHoleResult } from '../logic/llrr';
 
 const BEAN_FIELDS = [
   { key: 'longestDrive', label: 'Longest Drive (fairway)' },
   { key: 'closestRegulation', label: 'Closest in Regulation' },
   { key: 'onePutt', label: 'One Putt' },
+];
+
+const LLRR_POSITION_FIELDS = [
+  { position: 1, label: 'Left (1)' },
+  { position: 2, label: 'Left-Center (2)' },
+  { position: 3, label: 'Right-Center (3)' },
+  { position: 4, label: 'Right (4)' },
 ];
 
 const POLL_INTERVAL_MS = 3000;
@@ -38,6 +49,37 @@ function withHoleBean(game, holeNumber, field, userId) {
     holes: game.holes.map((h) =>
       h.holeNumber === holeNumber ? { ...h, beans: { ...h.beans, [field]: userId } } : h
     ),
+  };
+}
+
+function withHoleCoin(game, holeNumber, coinKey, userId) {
+  return {
+    ...game,
+    holes: game.holes.map((h) =>
+      h.holeNumber === holeNumber ? { ...h, coins: { ...h.coins, [coinKey]: userId } } : h
+    ),
+  };
+}
+
+// A player can only hold one Left Left Right Right tee position per hole -- mirrors
+// what the server does when a position is reassigned: clear that player out of any
+// other slot on this hole before (or instead of) placing them in the new one.
+function withHolePosition(game, holeNumber, position, userId) {
+  return {
+    ...game,
+    holes: game.holes.map((h) => {
+      if (h.holeNumber !== holeNumber) return h;
+      const nextPositions = { ...h.positions };
+      Object.keys(nextPositions).forEach((p) => {
+        if (nextPositions[p] === userId) delete nextPositions[p];
+      });
+      if (userId === null) {
+        delete nextPositions[position];
+      } else {
+        nextPositions[position] = userId;
+      }
+      return { ...h, positions: nextPositions };
+    }),
   };
 }
 
@@ -85,6 +127,13 @@ export default function ScorecardScreen({ route, navigation }) {
   const currentResult = holeWinners[holeIndex];
   const isLastHole = holeIndex === game.holes.length - 1;
 
+  const coinHolderStates = computeCoinHolders(game.holes);
+  const currentCoinHolders = coinHolderStates[holeIndex] || {};
+
+  const llrrEnabled =
+    game.playerIds.length === 4 && game.llrrPointValue !== null && game.llrrPointValue !== undefined;
+  const llrrResult = llrrEnabled ? computeHoleResult(hole, hole.positions || {}) : null;
+
   const incrementScore = async (playerId) => {
     try {
       const { score } = await adjustScore(game.id, hole.holeNumber, playerId, 1);
@@ -108,6 +157,26 @@ export default function ScorecardScreen({ route, navigation }) {
     try {
       await setBeanApi(game.id, hole.holeNumber, fieldKey, nextUserId);
       setGame((prev) => withHoleBean(prev, hole.holeNumber, fieldKey, nextUserId));
+    } catch (e) {
+      // next poll reconciles
+    }
+  };
+
+  const setCoinTag = async (coinKey, playerId) => {
+    const nextUserId = hole.coins?.[coinKey] === playerId ? null : playerId;
+    try {
+      await setCoin(game.id, hole.holeNumber, coinKey, nextUserId);
+      setGame((prev) => withHoleCoin(prev, hole.holeNumber, coinKey, nextUserId));
+    } catch (e) {
+      // next poll reconciles
+    }
+  };
+
+  const setPositionForSlot = async (position, playerId) => {
+    const nextUserId = hole.positions?.[position] === playerId ? null : playerId;
+    try {
+      await setPositionApi(game.id, hole.holeNumber, position, nextUserId);
+      setGame((prev) => withHolePosition(prev, hole.holeNumber, position, nextUserId));
     } catch (e) {
       // next poll reconciles
     }
@@ -181,7 +250,7 @@ export default function ScorecardScreen({ route, navigation }) {
         })}
       </ScrollView>
 
-      <View style={styles.body}>
+      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           {game.playerIds.map((pid) => (
             <ScoreStepper
@@ -234,7 +303,122 @@ export default function ScorecardScreen({ route, navigation }) {
             </ScrollView>
           </View>
         ))}
-      </View>
+
+        <View style={styles.coinsGroup}>
+          <Text style={styles.coinsGroupLabel}>COINS — POSITIVE ($1 each)</Text>
+          {POSITIVE_COINS.map((coin) => {
+            const holderId = currentCoinHolders[coin.key];
+            return (
+              <View key={coin.key} style={styles.coinSection}>
+                <View style={styles.coinLabelRow}>
+                  <Text style={styles.coinLabel}>{coin.label}</Text>
+                  <Text style={styles.coinHolder} numberOfLines={1}>
+                    {holderId ? `held by ${playerMap[holderId] || 'Unknown'}` : 'unclaimed'}
+                  </Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipRow}
+                >
+                  {game.playerIds.map((pid) => (
+                    <Chip
+                      key={pid}
+                      label={playerMap[pid] || 'Unknown'}
+                      selected={hole.coins?.[coin.key] === pid}
+                      onPress={() => setCoinTag(coin.key, pid)}
+                      color={colors.primary}
+                      compact
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={styles.coinsGroup}>
+          <Text style={styles.coinsGroupLabel}>COINS — NEGATIVE ($1 each)</Text>
+          {NEGATIVE_COINS.map((coin) => {
+            const holderId = currentCoinHolders[coin.key];
+            return (
+              <View key={coin.key} style={styles.coinSection}>
+                <View style={styles.coinLabelRow}>
+                  <Text style={styles.coinLabel}>{coin.label}</Text>
+                  <Text style={styles.coinHolder} numberOfLines={1}>
+                    {holderId ? `held by ${playerMap[holderId] || 'Unknown'}` : 'unclaimed'}
+                  </Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipRow}
+                >
+                  {game.playerIds.map((pid) => (
+                    <Chip
+                      key={pid}
+                      label={playerMap[pid] || 'Unknown'}
+                      selected={hole.coins?.[coin.key] === pid}
+                      onPress={() => setCoinTag(coin.key, pid)}
+                      color={colors.danger}
+                      compact
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            );
+          })}
+        </View>
+
+        {llrrEnabled && (
+          <View style={styles.coinsGroup}>
+            <Text style={styles.coinsGroupLabel}>LEFT LEFT RIGHT RIGHT — TEE ORDER</Text>
+            {LLRR_POSITION_FIELDS.map((field) => (
+              <View key={field.position} style={styles.beanSection}>
+                <Text style={styles.beanLabel}>{field.label}</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipRow}
+                >
+                  {game.playerIds.map((pid) => (
+                    <Chip
+                      key={pid}
+                      label={playerMap[pid] || 'Unknown'}
+                      selected={hole.positions?.[field.position] === pid}
+                      onPress={() => setPositionForSlot(field.position, pid)}
+                      color={colors.primary}
+                      compact
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            ))}
+
+            <View style={styles.resultBanner}>
+              {!llrrResult.resolved && (
+                <Text style={styles.resultTextMuted} numberOfLines={2}>
+                  Set all 4 tee positions and scores to see the result
+                </Text>
+              )}
+              {llrrResult.resolved && llrrResult.pushed && (
+                <Text style={styles.resultTextMuted} numberOfLines={1}>
+                  Push — no points this hole
+                </Text>
+              )}
+              {llrrResult.resolved && !llrrResult.pushed && (
+                <Text style={styles.resultTextWin} numberOfLines={2}>
+                  {llrrResult.winningTeam === 'a'
+                    ? `${playerMap[hole.positions[1]] || 'Unknown'} & ${playerMap[hole.positions[2]] || 'Unknown'}`
+                    : `${playerMap[hole.positions[3]] || 'Unknown'} & ${playerMap[hole.positions[4]] || 'Unknown'}`}
+                  {' '}win +{llrrResult.margin}
+                  {(llrrResult.teamABirdied || llrrResult.teamBBirdied) ? ' 🐦 birdie flip!' : ''}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+      </ScrollView>
 
       <View style={styles.footer}>
         <PrimaryButton
@@ -335,19 +519,24 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    justifyContent: 'space-evenly',
+  },
+  bodyContent: {
+    paddingBottom: spacing.lg,
   },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
   },
   resultBanner: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
   },
   resultTextMuted: {
     color: colors.textMuted,
@@ -360,13 +549,49 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  beanSection: {},
+  beanSection: {
+    marginBottom: spacing.sm,
+  },
   beanLabel: {
     fontSize: 12,
     fontWeight: '600',
     color: colors.textMuted,
     letterSpacing: 0.3,
     marginBottom: spacing.xs,
+  },
+  coinsGroup: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  coinsGroupLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+  },
+  coinSection: {
+    marginBottom: spacing.sm,
+  },
+  coinLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  coinLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  coinHolder: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginLeft: spacing.sm,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   chipRow: {
     flexDirection: 'row',

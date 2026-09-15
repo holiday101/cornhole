@@ -58,7 +58,10 @@ CREATE TABLE IF NOT EXISTS games (
   variant TEXT NOT NULL CHECK (variant IN ('front9', 'back9', 'full18')),
   holes_count INTEGER NOT NULL,
   date TEXT NOT NULL DEFAULT (datetime('now')),
-  completed INTEGER NOT NULL DEFAULT 0
+  completed INTEGER NOT NULL DEFAULT 0,
+  -- Left Left Right Right: $ value of one point, set at creation. NULL/absent = not played
+  -- this round. Only meaningful for 4-player games (enforced in the API, not here).
+  llrr_point_value REAL
 );
 
 CREATE TABLE IF NOT EXISTS game_players (
@@ -87,5 +90,32 @@ CREATE TABLE IF NOT EXISTS game_scores (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 15),
   PRIMARY KEY (game_id, hole_number, user_id),
+  FOREIGN KEY (game_id, hole_number) REFERENCES game_holes(game_id, hole_number) ON DELETE CASCADE
+);
+
+-- Coins: single-possession $1 chips. A coin is awarded to a player on a specific
+-- hole; it stays with that player on every later hole until someone else is
+-- awarded it (there is only ever one holder of a given coin_key at a time, derived
+-- by walking hole_number order and taking the latest non-null award). user_id is
+-- NULL to represent "not awarded on this hole" (no possession change that hole).
+CREATE TABLE IF NOT EXISTS game_hole_coins (
+  game_id INTEGER NOT NULL,
+  hole_number INTEGER NOT NULL,
+  coin_key TEXT NOT NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE RESTRICT,
+  PRIMARY KEY (game_id, hole_number, coin_key),
+  FOREIGN KEY (game_id, hole_number) REFERENCES game_holes(game_id, hole_number) ON DELETE CASCADE
+);
+-- Left Left Right Right: which of the 4 tee positions (1=leftmost ... 4=rightmost)
+-- each player held on this hole. Teams are always {1,2} vs {3,4} -- position 1&2 play
+-- position 3&4 -- and since ball position can differ hole to hole, teams reshuffle
+-- hole to hole. Only meaningful for 4-player games; rows simply won't exist otherwise.
+CREATE TABLE IF NOT EXISTS game_hole_positions (
+  game_id INTEGER NOT NULL,
+  hole_number INTEGER NOT NULL,
+  position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 4),
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  PRIMARY KEY (game_id, hole_number, position),
+  UNIQUE (game_id, hole_number, user_id),
   FOREIGN KEY (game_id, hole_number) REFERENCES game_holes(game_id, hole_number) ON DELETE CASCADE
 );

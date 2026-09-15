@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../components/Screen';
 import PrimaryButton from '../components/PrimaryButton';
 import Chip from '../components/Chip';
+import TextField from '../components/TextField';
 import { colors, spacing, typography } from '../theme';
 import { getCourses } from '../api/courses';
 import { getContacts } from '../api/contacts';
@@ -36,6 +37,7 @@ export default function NewGameScreen({ navigation }) {
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [variant, setVariant] = useState('front9');
   const [selected, setSelected] = useState([]);
+  const [llrrPointValueInput, setLlrrPointValueInput] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -48,6 +50,8 @@ export default function NewGameScreen({ navigation }) {
 
   const selectedCourse = courses.find((c) => c.id === selectedCourseId) || null;
   const variantOptions = variantOptionsFor(selectedCourse);
+  const playerCount = selected.length + 1;
+  const isFourPlayers = playerCount === MAX_PLAYERS;
 
   useEffect(() => {
     if (!variantOptions.some((o) => o.value === variant)) {
@@ -55,6 +59,10 @@ export default function NewGameScreen({ navigation }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (!isFourPlayers) setLlrrPointValueInput('');
+  }, [isFourPlayers]);
 
   const toggle = (id) => {
     setSelected((prev) => {
@@ -68,12 +76,25 @@ export default function NewGameScreen({ navigation }) {
 
   const handleStart = async () => {
     setError('');
+
+    const trimmedLlrr = llrrPointValueInput.trim();
+    let llrrPointValue = null;
+    if (isFourPlayers && trimmedLlrr !== '') {
+      const parsed = Number(trimmedLlrr);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        setError('Left Left Right Right $/point must be a positive number.');
+        return;
+      }
+      llrrPointValue = parsed;
+    }
+
     setSubmitting(true);
     try {
       const { game } = await createGame({
         courseId: selectedCourseId,
         variant,
         playerUserIds: selected,
+        llrrPointValue,
       });
       navigation.replace('Scorecard', { gameId: game.id });
     } catch (e) {
@@ -145,6 +166,18 @@ export default function NewGameScreen({ navigation }) {
         />
       )}
 
+      {isFourPlayers && (
+        <View style={styles.llrrBox}>
+          <TextField
+            label="LEFT LEFT RIGHT RIGHT — $ PER POINT (OPTIONAL)"
+            placeholder="e.g. 0.10 — leave blank to skip this game"
+            value={llrrPointValueInput}
+            onChangeText={setLlrrPointValueInput}
+            keyboardType="decimal-pad"
+          />
+        </View>
+      )}
+
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <PrimaryButton
@@ -182,6 +215,9 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 16,
     textAlign: 'center',
+  },
+  llrrBox: {
+    marginTop: spacing.md,
   },
   errorText: {
     color: colors.danger,

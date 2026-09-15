@@ -5,6 +5,10 @@ import PrimaryButton from '../components/PrimaryButton';
 import { colors, radius, spacing, typography } from '../theme';
 import { getGame } from '../api/games';
 import { summarizeBeans, totalScore } from '../logic/beans';
+import { summarizeCoins, COIN_TYPES } from '../logic/coins';
+import { summarizeLLRR } from '../logic/llrr';
+
+const COIN_LABELS = Object.fromEntries(COIN_TYPES.map((c) => [c.key, c]));
 
 const BEAN_COLUMNS = [
   { key: 'longestDrive', label: 'Drive' },
@@ -38,6 +42,10 @@ export default function GameSummaryScreen({ route, navigation }) {
   }
 
   const { totals, breakdown, holeWinners } = summarizeBeans(game);
+  const coinSummary = summarizeCoins(game);
+  const llrrEnabled =
+    game.playerIds.length === 4 && game.llrrPointValue !== null && game.llrrPointValue !== undefined;
+  const llrrSummary = llrrEnabled ? summarizeLLRR(game) : null;
 
   const leaderboard = game.playerIds
     .map((pid) => ({
@@ -101,6 +109,106 @@ export default function GameSummaryScreen({ route, navigation }) {
             </View>
           ))}
         </View>
+
+        <Text style={[typography.label, styles.sectionLabel]}>COIN BALANCES</Text>
+        <View style={styles.card}>
+          {game.playerIds.map((pid, i) => {
+            const net = coinSummary.net[pid] || 0;
+            const heldCoins = coinSummary.coinsByPlayer[pid] || [];
+            return (
+              <View key={pid} style={[styles.leaderRow, i === 0 && styles.leaderRowFirst]}>
+                <View style={styles.coinPlayerCol}>
+                  <Text style={styles.leaderName}>{playerMap[pid] || 'Unknown'}</Text>
+                  {heldCoins.length > 0 && (
+                    <Text style={styles.coinHeldList} numberOfLines={2}>
+                      {heldCoins.map((key) => COIN_LABELS[key]?.label).join(', ')}
+                    </Text>
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.coinNetText,
+                    net > 0 && styles.coinNetPositive,
+                    net < 0 && styles.coinNetNegative,
+                  ]}
+                >
+                  {net > 0 ? `+$${net}` : net < 0 ? `-$${Math.abs(net)}` : '$0'}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {coinSummary.settleUp.length > 0 && (
+          <>
+            <Text style={[typography.label, styles.sectionLabel]}>SETTLE UP</Text>
+            <View style={styles.card}>
+              {coinSummary.settleUp.map((t, i) => (
+                <View
+                  key={`${t.fromId}-${t.toId}`}
+                  style={[styles.settleRow, i === 0 && styles.leaderRowFirst]}
+                >
+                  <Text style={styles.settleText}>
+                    {(playerMap[t.fromId] || 'Unknown') + ' owes ' + (playerMap[t.toId] || 'Unknown')}
+                  </Text>
+                  <Text style={styles.settleAmount}>${t.amount}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {llrrEnabled && (
+          <>
+            <Text style={[typography.label, styles.sectionLabel]}>LEFT LEFT RIGHT RIGHT</Text>
+            <View style={styles.card}>
+              {game.playerIds.map((pid, i) => {
+                const points = llrrSummary.totals[pid] || 0;
+                const net = llrrSummary.net[pid] || 0;
+                return (
+                  <View key={pid} style={[styles.leaderRow, i === 0 && styles.leaderRowFirst]}>
+                    <Text style={styles.leaderName}>{playerMap[pid] || 'Unknown'}</Text>
+                    <Text style={styles.leaderStrokes}>
+                      {points > 0 ? `+${points}` : points} pts
+                    </Text>
+                    <Text
+                      style={[
+                        styles.coinNetText,
+                        net > 0 && styles.coinNetPositive,
+                        net < 0 && styles.coinNetNegative,
+                      ]}
+                    >
+                      {net > 0
+                        ? `+$${net.toFixed(2)}`
+                        : net < 0
+                        ? `-$${Math.abs(net).toFixed(2)}`
+                        : '$0.00'}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {llrrSummary.settleUp.length > 0 && (
+              <>
+                <Text style={[typography.label, styles.sectionLabel]}>LLRR SETTLE UP</Text>
+                <View style={styles.card}>
+                  {llrrSummary.settleUp.map((t, i) => (
+                    <View
+                      key={`llrr-${t.fromId}-${t.toId}`}
+                      style={[styles.settleRow, i === 0 && styles.leaderRowFirst]}
+                    >
+                      <Text style={styles.settleText}>
+                        {(playerMap[t.fromId] || 'Unknown') + ' owes ' + (playerMap[t.toId] || 'Unknown')}
+                      </Text>
+                      <Text style={styles.settleAmount}>${t.amount.toFixed(2)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+          </>
+        )}
 
         <Text style={[typography.label, styles.sectionLabel]}>HOLE BY HOLE</Text>
         <View style={styles.card}>
@@ -243,6 +351,44 @@ const styles = StyleSheet.create({
   },
   doneBtn: {
     marginBottom: spacing.md,
+  },
+  coinPlayerCol: {
+    flex: 1,
+  },
+  coinHeldList: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  coinNetText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  coinNetPositive: {
+    color: colors.primary,
+  },
+  coinNetNegative: {
+    color: colors.danger,
+  },
+  settleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  settleText: {
+    fontSize: 15,
+    color: colors.text,
+    flex: 1,
+  },
+  settleAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.danger,
+    marginLeft: spacing.sm,
   },
   holeRow: {
     paddingVertical: spacing.sm,
