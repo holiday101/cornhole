@@ -3,6 +3,8 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { sendEmail, escapeHtml } = require('../email');
 
+const APP_URL = process.env.APP_URL || 'https://membergolfonline.com/cornhole';
+
 const router = express.Router();
 
 function pair(a, b) {
@@ -72,8 +74,8 @@ router.post('/contacts', requireAuth, async (req, res) => {
     await sendEmail({
       to: normalizedEmail,
       subject: `${req.user.name} wants to play Cornhole Golf with you`,
-      html: `<p>${escapeHtml(req.user.name)} added you as a friend on Cornhole Golf, an app for tracking golf scores and side-bets with your group.</p><p>Sign up with this email address (${escapeHtml(normalizedEmail)}) and you'll automatically be connected as friends.</p>`,
-      text: `${req.user.name} added you as a friend on Cornhole Golf. Sign up with this email address (${normalizedEmail}) and you'll automatically be connected as friends.`,
+      html: `<p>${escapeHtml(req.user.name)} added you as a friend on Cornhole Golf, an app for tracking golf scores and side-bets with your group.</p><p>Sign up at <a href="${APP_URL}">${APP_URL}</a> with this email address (${escapeHtml(normalizedEmail)}) and you'll automatically be connected as friends.</p>`,
+      text: `${req.user.name} added you as a friend on Cornhole Golf. Sign up at ${APP_URL} with this email address (${normalizedEmail}) and you'll automatically be connected as friends.`,
     });
   } catch (e) {
     console.error('[contacts] failed to send invite email', e);
