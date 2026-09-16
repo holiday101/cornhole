@@ -22,7 +22,7 @@ function requireAuth(req, res, next) {
   }
 
   const user = db
-    .prepare('SELECT id, email, name FROM users WHERE id = ?')
+    .prepare('SELECT id, email, name, role FROM users WHERE id = ?')
     .get(session.user_id);
   if (!user) return res.status(401).json({ error: 'Invalid session' });
 
@@ -31,4 +31,12 @@ function requireAuth(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, hashToken };
+// Must run after requireAuth, which populates req.user.
+function requireAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireAdmin, hashToken };

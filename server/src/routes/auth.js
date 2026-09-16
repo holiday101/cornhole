@@ -34,7 +34,7 @@ const signupLimiter = rateLimit({
 });
 
 function toPublicUser(user) {
-  return { id: user.id, email: user.email, name: user.name };
+  return { id: user.id, email: user.email, name: user.name, role: user.role };
 }
 
 function createSession(userId) {

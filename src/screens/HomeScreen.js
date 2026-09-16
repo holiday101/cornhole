@@ -52,6 +52,14 @@ export default function HomeScreen({ navigation }) {
             style={styles.spaced}
           />
         ) : null}
+        {user && user.role === 'admin' ? (
+          <PrimaryButton
+            title="Manage Users"
+            variant="outline"
+            onPress={() => navigation.navigate('AdminUsers')}
+            style={styles.spaced}
+          />
+        ) : null}
         <Pressable onPress={logout} style={styles.logoutRow}>
           <Text style={styles.logoutText}>Log Out</Text>
         </Pressable>

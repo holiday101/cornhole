@@ -27,4 +27,14 @@ if (!hasEnabledCoinsColumn) {
   db.exec('ALTER TABLE games ADD COLUMN enabled_coins TEXT');
 }
 
+// Same story for `role` on `users` -- SQLite's ADD COLUMN can't carry a CHECK
+// that isn't a constant expression, so the 'user'/'admin' constraint is only
+// enforced by schema.sql on a fresh database; existing rows just get the
+// 'user' default and the API validates the value on every write.
+const userColumns = db.prepare('PRAGMA table_info(users)').all();
+const hasRoleColumn = userColumns.some((col) => col.name === 'role');
+if (!hasRoleColumn) {
+  db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+}
+
 module.exports = db;

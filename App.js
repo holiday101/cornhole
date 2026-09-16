@@ -17,6 +17,8 @@ import PlayerStatsScreen from './src/screens/PlayerStatsScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
+import AdminUsersScreen from './src/screens/AdminUsersScreen';
+import AdminUserFriendsScreen from './src/screens/AdminUserFriendsScreen';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { colors } from './src/theme';
 
@@ -88,6 +90,20 @@ function AppNavigator() {
               component={LeaderboardScreen}
               options={{ title: 'Leaderboard' }}
             />
+            {user.role === 'admin' && (
+              <>
+                <Stack.Screen
+                  name="AdminUsers"
+                  component={AdminUsersScreen}
+                  options={{ title: 'Manage Users' }}
+                />
+                <Stack.Screen
+                  name="AdminUserFriends"
+                  component={AdminUserFriendsScreen}
+                  options={({ route }) => ({ title: `${route.params.userName}'s Friends` })}
+                />
+              </>
+            )}
           </>
         ) : (
           <>
