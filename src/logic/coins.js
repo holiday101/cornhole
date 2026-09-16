@@ -10,6 +10,10 @@
 // paying every other player $1 for every coin you hold — just collapsed into one
 // payment per pair instead of one per coin.
 
+// Longest Drive and G.I.R. (green in regulation) aren't here on purpose -- they're
+// already tracked as "beans" (see BEAN_FIELDS in ScorecardScreen), a different,
+// winner-of-the-hole mechanic. Adding them again as coins would double up the same
+// idea under two different UIs.
 export const COIN_TYPES = [
   { key: 'birdie', label: 'Birdie', positive: true },
   { key: 'one_putt', label: 'One Putt', positive: true },
@@ -17,6 +21,11 @@ export const COIN_TYPES = [
   { key: 'eagle', label: 'Eagle', positive: true },
   { key: 'sand_save', label: 'Sand Save', positive: true },
   { key: 'chip_in', label: 'Chip In', positive: true },
+  { key: 'lowest_score', label: 'Lowest Score', positive: true },
+  { key: 'wild_card', label: 'Wild Card', positive: true },
+  { key: 'putt_off', label: 'Putt Off', positive: true },
+  { key: 'par_tee', label: 'Par-Tee', positive: true },
+  { key: 'seven', label: 'Seven', positive: true },
   { key: 'three_putt', label: '3-Putt', positive: false },
   { key: 'sand', label: 'Sand', positive: false },
   { key: 'tree', label: 'Tree', positive: false },
@@ -24,6 +33,12 @@ export const COIN_TYPES = [
   { key: 'out_of_bounds', label: 'Out of Bounds', positive: false },
   { key: 'water', label: 'Water', positive: false },
   { key: 'score_8', label: 'Score an 8', positive: false },
+  { key: 'highest_score', label: 'Highest Score', positive: false },
+  { key: 'skull', label: 'Skull', positive: false },
+  { key: 'beer', label: 'Beer', positive: false },
+  { key: 'grave_digger', label: 'Grave Digger', positive: false },
+  { key: 'worm_burner', label: 'Worm Burner', positive: false },
+  { key: 'lost_ball', label: 'Lost Ball', positive: false },
 ];
 
 export const POSITIVE_COINS = COIN_TYPES.filter((c) => c.positive);

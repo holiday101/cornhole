@@ -26,6 +26,11 @@ const COIN_KEYS = new Set([
   'eagle',
   'sand_save',
   'chip_in',
+  'lowest_score',
+  'wild_card',
+  'putt_off',
+  'par_tee',
+  'seven',
   'three_putt',
   'sand',
   'tree',
@@ -33,6 +38,12 @@ const COIN_KEYS = new Set([
   'out_of_bounds',
   'water',
   'score_8',
+  'highest_score',
+  'skull',
+  'beer',
+  'grave_digger',
+  'worm_burner',
+  'lost_ball',
 ]);
 
 const ALL_COIN_KEYS = Array.from(COIN_KEYS);
