@@ -1,20 +1,24 @@
 const express = require('express');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-function loadCourse(id) {
+function loadCourse(id, userId) {
   const course = db.prepare('SELECT * FROM courses WHERE id = ?').get(id);
   if (!course) return null;
   const holes = db
     .prepare('SELECT hole_number AS number, par FROM course_holes WHERE course_id = ? ORDER BY hole_number')
     .all(id);
+  const isFavorite = !!db
+    .prepare('SELECT 1 FROM course_favorites WHERE user_id = ? AND course_id = ?')
+    .get(userId, id);
   return {
     id: course.id,
     name: course.name,
     holesCount: course.holes_count,
     createdByUserId: course.created_by_user_id,
+    isFavorite,
     holes,
   };
 }
@@ -31,17 +35,22 @@ function validateHoles(holesCount, holes) {
 }
 
 router.get('/courses', requireAuth, (req, res) => {
-  const courses = db.prepare('SELECT id FROM courses ORDER BY name').all().map((c) => loadCourse(c.id));
+  const courses = db
+    .prepare('SELECT id FROM courses ORDER BY name')
+    .all()
+    .map((c) => loadCourse(c.id, req.user.id));
   res.json({ courses });
 });
 
 router.get('/courses/:id', requireAuth, (req, res) => {
-  const course = loadCourse(req.params.id);
+  const course = loadCourse(req.params.id, req.user.id);
   if (!course) return res.status(404).json({ error: 'Course not found' });
   res.json({ course });
 });
 
-router.post('/courses', requireAuth, (req, res) => {
+// Courses are shared/global (a friend group plays the same physical course),
+// so only admins manage the canonical list -- everyone else views and favorites.
+router.post('/courses', requireAuth, requireAdmin, (req, res) => {
   const { name, holesCount, holes } = req.body || {};
   if (typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'Course name is required' });
@@ -66,15 +75,12 @@ router.post('/courses', requireAuth, (req, res) => {
     return info.lastInsertRowid;
   })();
 
-  res.status(201).json({ course: loadCourse(courseId) });
+  res.status(201).json({ course: loadCourse(courseId, req.user.id) });
 });
 
-router.put('/courses/:id', requireAuth, (req, res) => {
+router.put('/courses/:id', requireAuth, requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM courses WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Course not found' });
-  if (existing.created_by_user_id !== req.user.id) {
-    return res.status(403).json({ error: 'Only the course creator can edit it' });
-  }
 
   const { name, holesCount, holes } = req.body || {};
   if (typeof name !== 'string' || !name.trim()) {
@@ -100,16 +106,31 @@ router.put('/courses/:id', requireAuth, (req, res) => {
     for (const h of holes) insertHole.run(existing.id, h.number, h.par);
   })();
 
-  res.json({ course: loadCourse(existing.id) });
+  res.json({ course: loadCourse(existing.id, req.user.id) });
 });
 
-router.delete('/courses/:id', requireAuth, (req, res) => {
-  const existing = db.prepare('SELECT * FROM courses WHERE id = ?').get(req.params.id);
+router.delete('/courses/:id', requireAuth, requireAdmin, (req, res) => {
+  const existing = db.prepare('SELECT id FROM courses WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Course not found' });
-  if (existing.created_by_user_id !== req.user.id) {
-    return res.status(403).json({ error: 'Only the course creator can delete it' });
-  }
   db.prepare('DELETE FROM courses WHERE id = ?').run(existing.id);
+  res.status(204).end();
+});
+
+router.post('/courses/:id/favorite', requireAuth, (req, res) => {
+  const existing = db.prepare('SELECT id FROM courses WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Course not found' });
+  db.prepare('INSERT OR IGNORE INTO course_favorites (user_id, course_id) VALUES (?, ?)').run(
+    req.user.id,
+    existing.id
+  );
+  res.status(204).end();
+});
+
+router.delete('/courses/:id/favorite', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM course_favorites WHERE user_id = ? AND course_id = ?').run(
+    req.user.id,
+    req.params.id
+  );
   res.status(204).end();
 });
 

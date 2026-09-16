@@ -19,3 +19,11 @@ export function updateCourse(id, { name, holesCount, holes }) {
 export function deleteCourse(id) {
   return api.del(`/courses/${id}`);
 }
+
+export function addFavorite(id) {
+  return api.post(`/courses/${id}/favorite`);
+}
+
+export function removeFavorite(id) {
+  return api.del(`/courses/${id}/favorite`);
+}

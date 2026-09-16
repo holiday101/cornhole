@@ -27,7 +27,6 @@ export default function CourseEditScreen({ route, navigation }) {
   const [name, setName] = useState('');
   const [holesCount, setHolesCount] = useState(9);
   const [pars, setPars] = useState(() => defaultPars(9));
-  const [createdByUserId, setCreatedByUserId] = useState(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -45,13 +44,12 @@ export default function CourseEditScreen({ route, navigation }) {
         const existing = {};
         course.holes.forEach((h) => (existing[h.number] = String(h.par)));
         setPars(defaultPars(course.holesCount, existing));
-        setCreatedByUserId(course.createdByUserId);
       })
       .catch(() => setError('Could not load this course.'))
       .finally(() => setLoading(false));
   }, [courseId, isNew]);
 
-  const canEdit = isNew || createdByUserId === user.id;
+  const canEdit = user.role === 'admin';
 
   const changeHolesCount = (n) => {
     setHolesCount(n);
@@ -118,7 +116,7 @@ export default function CourseEditScreen({ route, navigation }) {
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {!canEdit && (
-          <Text style={styles.readonlyBanner}>Only the creator can edit this course.</Text>
+          <Text style={styles.readonlyBanner}>Only admins can edit courses.</Text>
         )}
 
         <TextField

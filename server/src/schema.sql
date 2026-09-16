@@ -52,6 +52,15 @@ CREATE TABLE IF NOT EXISTS course_holes (
   PRIMARY KEY (course_id, hole_number)
 );
 
+-- a personal bookmark on a shared course, not history -- cascades both ways
+-- so it never blocks deleting a user or a course.
+CREATE TABLE IF NOT EXISTS course_favorites (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, course_id)
+);
+
 CREATE TABLE IF NOT EXISTS games (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   creator_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,

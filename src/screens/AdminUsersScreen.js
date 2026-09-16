@@ -67,8 +67,8 @@ export default function AdminUsersScreen({ navigation }) {
     <Screen>
       <Text style={[typography.title, styles.title]}>Manage Users</Text>
       <Text style={styles.hint}>
-        Promote a friend to admin, or remove an account. Users with game or course history
-        can't be deleted -- change their role instead.
+        Promote a friend to admin, or remove an account. Any courses they created move to
+        you. Users with game history can't be deleted -- change their role instead.
       </Text>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}

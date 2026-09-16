@@ -63,22 +63,28 @@ router.delete('/admin/users/:id', (req, res) => {
     }
   }
 
-  // Sessions and contacts reference users with ON DELETE RESTRICT (unlike
-  // pending_invites, which cascades), so they have to go before the user
-  // row itself. Game/course history is left under RESTRICT on purpose --
-  // caught below and reported rather than silently wiped.
-  const deleteUser = db.transaction((id) => {
+  // Courses are shared/global now (see routes/courses.js), so a course this
+  // user created just moves to whichever admin is doing the deleting rather
+  // than blocking it. Sessions and contacts reference users with ON DELETE
+  // RESTRICT (unlike pending_invites, which cascades), so they have to go
+  // before the user row itself. Game history is left under RESTRICT on
+  // purpose -- caught below and reported rather than silently wiped.
+  const deleteUser = db.transaction((id, reassignToId) => {
+    db.prepare('UPDATE courses SET created_by_user_id = ? WHERE created_by_user_id = ?').run(
+      reassignToId,
+      id
+    );
     db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM contacts WHERE user_a_id = ? OR user_b_id = ?').run(id, id);
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
   });
 
   try {
-    deleteUser(targetId);
+    deleteUser(targetId, req.user.id);
   } catch (e) {
     if (/FOREIGN KEY constraint failed/.test(e.message)) {
       return res.status(409).json({
-        error: 'This user has game or course history and cannot be deleted. Change their role instead.',
+        error: 'This user has game history and cannot be deleted. Change their role instead.',
       });
     }
     throw e;
