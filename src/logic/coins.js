@@ -79,6 +79,23 @@ export function computeCoinHolders(holes) {
   });
 }
 
+// Each player's net $ balance for a given holders snapshot (e.g. one entry from
+// computeCoinHolders) -- used to show the running total as of the hole being viewed,
+// not just the final one summarizeCoins reports.
+export function computeCoinNet(holders, playerIds) {
+  const net = {};
+  playerIds.forEach((id) => {
+    net[id] = 0;
+  });
+  COIN_TYPES.forEach((c) => {
+    const holderId = holders[c.key];
+    if (holderId !== null && holderId !== undefined && net[holderId] !== undefined) {
+      net[holderId] += coinValue(c);
+    }
+  });
+  return net;
+}
+
 // Final holders + each player's net $ balance + a pairwise settle-up list.
 export function summarizeCoins(game) {
   const holderStates = computeCoinHolders(game.holes);

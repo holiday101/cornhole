@@ -1,14 +1,21 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { colors, radius, spacing } from '../theme';
 
-export default function ScoreStepper({ label, value, onIncrement, onDecrement }) {
+export default function ScoreStepper({ label, subLabel, subLabelColor, value, onIncrement, onDecrement }) {
   const hasValue = value !== undefined && value !== null && value !== '';
 
   return (
     <View style={styles.row}>
-      <Text style={styles.label} numberOfLines={1}>
-        {label}
-      </Text>
+      <View style={styles.labelCol}>
+        <Text style={styles.label} numberOfLines={1}>
+          {label}
+        </Text>
+        {subLabel ? (
+          <Text style={[styles.subLabel, subLabelColor && { color: subLabelColor }]} numberOfLines={1}>
+            {subLabel}
+          </Text>
+        ) : null}
+      </View>
       <View style={styles.stepper}>
         <Pressable onPress={onDecrement} style={styles.btn} hitSlop={8}>
           <Text style={styles.btnText}>−</Text>
@@ -29,12 +36,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.sm,
   },
+  labelCol: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
   label: {
     fontSize: 15,
     fontWeight: '600',
     color: colors.text,
-    flex: 1,
-    marginRight: spacing.sm,
+  },
+  subLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    marginTop: 1,
   },
   stepper: {
     flexDirection: 'row',

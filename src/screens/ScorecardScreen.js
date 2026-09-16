@@ -4,6 +4,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../components/Screen';
 import PrimaryButton from '../components/PrimaryButton';
 import Chip from '../components/Chip';
+import CoinIcon from '../components/CoinIcon';
+import PlayerDropdown from '../components/PlayerDropdown';
 import ScoreStepper from '../components/ScoreStepper';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { colors, radius, spacing } from '../theme';
@@ -16,7 +18,7 @@ import {
   setCompleted,
 } from '../api/games';
 import { computeHoleWinners } from '../logic/beans';
-import { computeCoinHolders, enabledCoinTypes } from '../logic/coins';
+import { computeCoinHolders, computeCoinNet, enabledCoinTypes } from '../logic/coins';
 import { computeHoleResult } from '../logic/llrr';
 
 const BEAN_FIELDS = [
@@ -26,10 +28,10 @@ const BEAN_FIELDS = [
 ];
 
 const LLRR_POSITION_FIELDS = [
-  { position: 1, label: 'Left (1)' },
-  { position: 2, label: 'Left-Center (2)' },
-  { position: 3, label: 'Right-Center (3)' },
-  { position: 4, label: 'Right (4)' },
+  { position: 1, label: 'Left 1' },
+  { position: 2, label: 'Left 2' },
+  { position: 3, label: 'Right 1' },
+  { position: 4, label: 'Right 2' },
 ];
 
 const POLL_INTERVAL_MS = 3000;
@@ -129,6 +131,7 @@ export default function ScorecardScreen({ route, navigation }) {
 
   const coinHolderStates = computeCoinHolders(game.holes);
   const currentCoinHolders = coinHolderStates[holeIndex] || {};
+  const currentCoinNet = computeCoinNet(currentCoinHolders, game.playerIds);
   const gameCoinTypes = enabledCoinTypes(game);
   const positiveCoins = gameCoinTypes.filter((c) => c.positive);
   const negativeCoins = gameCoinTypes.filter((c) => !c.positive);
@@ -165,11 +168,10 @@ export default function ScorecardScreen({ route, navigation }) {
     }
   };
 
-  const setCoinTag = async (coinKey, playerId) => {
-    const nextUserId = hole.coins?.[coinKey] === playerId ? null : playerId;
+  const setCoinHolder = async (coinKey, playerId) => {
     try {
-      await setCoin(game.id, hole.holeNumber, coinKey, nextUserId);
-      setGame((prev) => withHoleCoin(prev, hole.holeNumber, coinKey, nextUserId));
+      await setCoin(game.id, hole.holeNumber, coinKey, playerId);
+      setGame((prev) => withHoleCoin(prev, hole.holeNumber, coinKey, playerId));
     } catch (e) {
       // next poll reconciles
     }
@@ -255,15 +257,20 @@ export default function ScorecardScreen({ route, navigation }) {
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
-          {game.playerIds.map((pid) => (
-            <ScoreStepper
-              key={pid}
-              label={playerMap[pid] || 'Unknown'}
-              value={hole.scores[pid]}
-              onIncrement={() => incrementScore(pid)}
-              onDecrement={() => decrementScore(pid)}
-            />
-          ))}
+          {game.playerIds.map((pid) => {
+            const net = currentCoinNet[pid] || 0;
+            return (
+              <ScoreStepper
+                key={pid}
+                label={playerMap[pid] || 'Unknown'}
+                subLabel={gameCoinTypes.length > 0 ? `${net > 0 ? '+' : ''}$${net}` : undefined}
+                subLabelColor={net > 0 ? colors.primary : net < 0 ? colors.danger : colors.textMuted}
+                value={hole.scores[pid]}
+                onIncrement={() => incrementScore(pid)}
+                onDecrement={() => decrementScore(pid)}
+              />
+            );
+          })}
         </View>
 
         <View style={styles.resultBanner}>
@@ -296,16 +303,23 @@ export default function ScorecardScreen({ route, navigation }) {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.chipRow}
                 >
-                  {game.playerIds.map((pid) => (
-                    <Chip
-                      key={pid}
-                      label={playerMap[pid] || 'Unknown'}
-                      selected={hole.positions?.[field.position] === pid}
-                      onPress={() => setPositionForSlot(field.position, pid)}
-                      color={colors.primary}
-                      compact
-                    />
-                  ))}
+                  {game.playerIds.map((pid) => {
+                    const selectedHere = hole.positions?.[field.position] === pid;
+                    const usedElsewhere = Object.entries(hole.positions || {}).some(
+                      ([pos, assignedId]) => Number(pos) !== field.position && assignedId === pid
+                    );
+                    return (
+                      <Chip
+                        key={pid}
+                        label={playerMap[pid] || 'Unknown'}
+                        selected={selectedHere}
+                        disabled={usedElsewhere}
+                        onPress={() => setPositionForSlot(field.position, pid)}
+                        color={colors.primary}
+                        compact
+                      />
+                    );
+                  })}
                 </ScrollView>
               </View>
             ))}
@@ -360,31 +374,20 @@ export default function ScorecardScreen({ route, navigation }) {
           <View style={styles.coinsGroup}>
             <Text style={styles.coinsGroupLabel}>COINS — POSITIVE ($1 each)</Text>
             {positiveCoins.map((coin) => {
-              const holderId = currentCoinHolders[coin.key];
+              const holderId = currentCoinHolders[coin.key] ?? null;
               return (
                 <View key={coin.key} style={styles.coinSection}>
                   <View style={styles.coinLabelRow}>
-                    <Text style={styles.coinLabel}>{coin.label}</Text>
-                    <Text style={styles.coinHolder} numberOfLines={1}>
-                      {holderId ? `held by ${playerMap[holderId] || 'Unknown'}` : 'unclaimed'}
-                    </Text>
+                    <View style={[styles.coinIconBadge, { backgroundColor: colors.primary }]}>
+                      <CoinIcon coinKey={coin.key} size={18} color={colors.white} />
+                    </View>
+                    <PlayerDropdown
+                      value={holderId}
+                      options={game.playerIds.map((pid) => ({ id: pid, name: playerMap[pid] || 'Unknown' }))}
+                      onChange={(pid) => setCoinHolder(coin.key, pid)}
+                      accentColor={colors.primary}
+                    />
                   </View>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.chipRow}
-                  >
-                    {game.playerIds.map((pid) => (
-                      <Chip
-                        key={pid}
-                        label={playerMap[pid] || 'Unknown'}
-                        selected={hole.coins?.[coin.key] === pid}
-                        onPress={() => setCoinTag(coin.key, pid)}
-                        color={colors.primary}
-                        compact
-                      />
-                    ))}
-                  </ScrollView>
                 </View>
               );
             })}
@@ -395,31 +398,20 @@ export default function ScorecardScreen({ route, navigation }) {
           <View style={styles.coinsGroup}>
             <Text style={styles.coinsGroupLabel}>COINS — NEGATIVE ($1 each)</Text>
             {negativeCoins.map((coin) => {
-              const holderId = currentCoinHolders[coin.key];
+              const holderId = currentCoinHolders[coin.key] ?? null;
               return (
                 <View key={coin.key} style={styles.coinSection}>
                   <View style={styles.coinLabelRow}>
-                    <Text style={styles.coinLabel}>{coin.label}</Text>
-                    <Text style={styles.coinHolder} numberOfLines={1}>
-                      {holderId ? `held by ${playerMap[holderId] || 'Unknown'}` : 'unclaimed'}
-                    </Text>
+                    <View style={[styles.coinIconBadge, { backgroundColor: colors.danger }]}>
+                      <CoinIcon coinKey={coin.key} size={18} color={colors.white} />
+                    </View>
+                    <PlayerDropdown
+                      value={holderId}
+                      options={game.playerIds.map((pid) => ({ id: pid, name: playerMap[pid] || 'Unknown' }))}
+                      onChange={(pid) => setCoinHolder(coin.key, pid)}
+                      accentColor={colors.danger}
+                    />
                   </View>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.chipRow}
-                  >
-                    {game.playerIds.map((pid) => (
-                      <Chip
-                        key={pid}
-                        label={playerMap[pid] || 'Unknown'}
-                        selected={hole.coins?.[coin.key] === pid}
-                        onPress={() => setCoinTag(coin.key, pid)}
-                        color={colors.danger}
-                        compact
-                      />
-                    ))}
-                  </ScrollView>
                 </View>
               );
             })}
@@ -584,21 +576,14 @@ const styles = StyleSheet.create({
   },
   coinLabelRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+    alignItems: 'center',
   },
-  coinLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  coinHolder: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginLeft: spacing.sm,
-    flexShrink: 1,
-    textAlign: 'right',
+  coinIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chipRow: {
     flexDirection: 'row',
