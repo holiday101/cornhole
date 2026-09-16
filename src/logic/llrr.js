@@ -124,7 +124,7 @@ export function computeHoleResults(game) {
 // on a hole IS already the full head-to-head swing -- so a player's final net is their
 // real payout, and this settles it with the minimum number of $ handoffs rather than
 // multiplying it by the number of opponents.
-function settleUpFromNet(net, playerIds) {
+export function settleUpFromNet(net, playerIds) {
   const EPSILON = 1e-9;
   const creditors = playerIds
     .map((id) => ({ id, amount: net[id] }))
