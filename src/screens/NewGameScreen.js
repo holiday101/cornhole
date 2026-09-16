@@ -17,6 +17,7 @@ const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 4;
 const ALL_COIN_KEYS = COIN_TYPES.map((c) => c.key);
 const DEFAULT_LLRR_POINT_VALUE = '0.10';
+const DEFAULT_BEANS_VALUE = '0.25';
 
 function variantOptionsFor(course) {
   if (!course) {
@@ -44,6 +45,8 @@ export default function NewGameScreen({ navigation }) {
   const [enabledCoins, setEnabledCoins] = useState(ALL_COIN_KEYS);
   const [llrrEnabled, setLlrrEnabled] = useState(true);
   const [llrrPointValueInput, setLlrrPointValueInput] = useState(DEFAULT_LLRR_POINT_VALUE);
+  const [beansEnabled, setBeansEnabled] = useState(true);
+  const [beansValueInput, setBeansValueInput] = useState(DEFAULT_BEANS_VALUE);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -96,6 +99,17 @@ export default function NewGameScreen({ navigation }) {
       llrrPointValue = parsed;
     }
 
+    let beansValue = null;
+    if (beansEnabled) {
+      const trimmedBeans = beansValueInput.trim();
+      const parsedBeans = Number(trimmedBeans);
+      if (trimmedBeans === '' || !Number.isFinite(parsedBeans) || parsedBeans < 0) {
+        setError('Beans $/bean must be a positive number.');
+        return;
+      }
+      beansValue = parsedBeans;
+    }
+
     setSubmitting(true);
     try {
       const { game } = await createGame({
@@ -104,6 +118,7 @@ export default function NewGameScreen({ navigation }) {
         playerUserIds: selected,
         llrrPointValue,
         enabledCoins,
+        beansValue,
       });
       navigation.replace('Scorecard', { gameId: game.id });
     } catch (e) {
@@ -207,6 +222,26 @@ export default function NewGameScreen({ navigation }) {
               onPress={() => toggleCoin(c.key)}
             />
           ))}
+        </View>
+
+        <View style={styles.llrrBox}>
+          <Text style={[typography.label, styles.llrrTitle]}>BEANS</Text>
+          <Text style={styles.llrrHint}>
+            Skins-style pot for longest drive, CIR, one-putt, and low score on the hole.
+          </Text>
+          <View style={styles.chipRow}>
+            <Chip label="Play" selected={beansEnabled} onPress={() => setBeansEnabled(true)} />
+            <Chip label="Skip" selected={!beansEnabled} onPress={() => setBeansEnabled(false)} />
+          </View>
+          {beansEnabled && (
+            <TextField
+              label="$ PER BEAN"
+              placeholder="e.g. 0.25"
+              value={beansValueInput}
+              onChangeText={setBeansValueInput}
+              keyboardType="decimal-pad"
+            />
+          )}
         </View>
 
         <View

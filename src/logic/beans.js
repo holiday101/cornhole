@@ -36,7 +36,17 @@ export function computeHoleWinners(holes, playerIds) {
   return results;
 }
 
-// Aggregates every bean type into per-player totals + a breakdown for the summary screen.
+// Whether this game has a $ value attached to beans -- NULL/undefined means beans are
+// just being counted for fun, with no settle-up owed.
+export function beansEnabled(game) {
+  return game?.beansValue !== null && game?.beansValue !== undefined;
+}
+
+// Aggregates every bean type into per-player totals + a breakdown for the summary screen,
+// plus (when the game has a beansValue) each player's $ net and a pairwise settle-up list.
+// Like coins, each bean is worth a flat $ amount to whoever holds it -- unlike LLRR,
+// beans aren't a head-to-head swing, so settling up uses the same "every pair compares
+// nets" approach as coins' summarizeCoins rather than LLRR's minimal-handoff matching.
 export function summarizeBeans(game) {
   const holeWinners = computeHoleWinners(game.holes, game.playerIds);
 
@@ -69,7 +79,23 @@ export function summarizeBeans(game) {
     }
   });
 
-  return { holeWinners, totals, breakdown };
+  const beanValue = game.beansValue || 0;
+  const net = {};
+  game.playerIds.forEach((id) => {
+    net[id] = totals[id] * beanValue;
+  });
+
+  const settleUp = [];
+  const ids = game.playerIds;
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      const diff = net[ids[j]] - net[ids[i]];
+      if (diff > 0) settleUp.push({ fromId: ids[i], toId: ids[j], amount: diff });
+      else if (diff < 0) settleUp.push({ fromId: ids[j], toId: ids[i], amount: -diff });
+    }
+  }
+
+  return { holeWinners, totals, breakdown, net, settleUp };
 }
 
 export function totalScore(hole_or_holes, playerId) {

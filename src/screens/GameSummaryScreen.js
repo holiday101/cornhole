@@ -41,7 +41,8 @@ export default function GameSummaryScreen({ route, navigation }) {
     );
   }
 
-  const { totals, breakdown, holeWinners } = summarizeBeans(game);
+  const { totals, breakdown, holeWinners, settleUp: beansSettleUp } = summarizeBeans(game);
+  const beansEnabled = game.beansValue !== null && game.beansValue !== undefined;
   const coinSummary = summarizeCoins(game);
   const llrrEnabled =
     game.playerIds.length === 4 && game.llrrPointValue !== null && game.llrrPointValue !== undefined;
@@ -109,6 +110,25 @@ export default function GameSummaryScreen({ route, navigation }) {
             </View>
           ))}
         </View>
+
+        {beansEnabled && beansSettleUp.length > 0 && (
+          <>
+            <Text style={[typography.label, styles.sectionLabel]}>BEANS SETTLE UP</Text>
+            <View style={styles.card}>
+              {beansSettleUp.map((t, i) => (
+                <View
+                  key={`beans-${t.fromId}-${t.toId}`}
+                  style={[styles.settleRow, i === 0 && styles.leaderRowFirst]}
+                >
+                  <Text style={styles.settleText}>
+                    {(playerMap[t.fromId] || 'Unknown') + ' owes ' + (playerMap[t.toId] || 'Unknown')}
+                  </Text>
+                  <Text style={styles.settleAmount}>${t.amount.toFixed(2)}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         <Text style={[typography.label, styles.sectionLabel]}>COIN BALANCES</Text>
         <View style={styles.card}>

@@ -161,6 +161,8 @@ function loadFullGame(gameId) {
     llrrPointValue: game.llrr_point_value,
     // Which coin_key values are in play for this game (see COIN_TYPES in src/logic/coins.js).
     enabledCoins: parseEnabledCoins(game),
+    // $ value of one bean for this game, or null if beans aren't wagered this round.
+    beansValue: game.beans_value,
   };
 }
 
@@ -171,6 +173,7 @@ router.post('/games', requireAuth, (req, res) => {
     playerUserIds,
     llrrPointValue: rawLlrrPointValue,
     enabledCoins: rawEnabledCoins,
+    beansValue: rawBeansValue,
   } = req.body || {};
 
   if (!Object.prototype.hasOwnProperty.call(VARIANT_RANGES, variant)) {
@@ -215,6 +218,17 @@ router.post('/games', requireAuth, (req, res) => {
     llrrPointValue = parsed;
   }
 
+  // Beans is playable with any number of players (unlike LLRR), so there's no roster
+  // restriction here -- omitting beansValue entirely just means beans aren't wagered.
+  let beansValue = null;
+  if (rawBeansValue !== null && rawBeansValue !== undefined && rawBeansValue !== '') {
+    const parsedBeans = Number(rawBeansValue);
+    if (!Number.isFinite(parsedBeans) || parsedBeans < 0) {
+      return res.status(400).json({ error: 'beansValue must be a non-negative number' });
+    }
+    beansValue = parsedBeans;
+  }
+
   // Omitting enabledCoins (or sending something malformed) plays every coin type --
   // the same "everything on" default the app used before chip selection existed.
   let enabledCoins = ALL_COIN_KEYS;
@@ -235,8 +249,8 @@ router.post('/games', requireAuth, (req, res) => {
   }
 
   const insertGame = db.prepare(
-    `INSERT INTO games (creator_user_id, course_id, variant, holes_count, llrr_point_value, enabled_coins)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO games (creator_user_id, course_id, variant, holes_count, llrr_point_value, enabled_coins, beans_value)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
   const insertPlayer = db.prepare(
     'INSERT INTO game_players (game_id, user_id, sort_order) VALUES (?, ?, ?)'
@@ -255,7 +269,8 @@ router.post('/games', requireAuth, (req, res) => {
       variant,
       holeNumbers.length,
       llrrPointValue,
-      JSON.stringify(enabledCoins)
+      JSON.stringify(enabledCoins),
+      beansValue
     );
     const newGameId = info.lastInsertRowid;
 

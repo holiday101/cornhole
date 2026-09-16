@@ -75,7 +75,10 @@ CREATE TABLE IF NOT EXISTS games (
   -- JSON array of coin_key strings enabled for this game (see game_hole_coins below).
   -- NULL means "all coins" -- the implicit default before this column existed, and
   -- still the default for a game created without an explicit chip selection.
-  enabled_coins TEXT
+  enabled_coins TEXT,
+  -- $ value of one bean (see game_holes' bean columns / game_hole_coins-style skins pot
+  -- in src/logic/beans.js), set at creation. NULL/absent = beans aren't wagered this round.
+  beans_value REAL
 );
 
 CREATE TABLE IF NOT EXISTS game_players (

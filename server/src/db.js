@@ -26,6 +26,10 @@ const hasEnabledCoinsColumn = gameColumns.some((col) => col.name === 'enabled_co
 if (!hasEnabledCoinsColumn) {
   db.exec('ALTER TABLE games ADD COLUMN enabled_coins TEXT');
 }
+const hasBeansValueColumn = gameColumns.some((col) => col.name === 'beans_value');
+if (!hasBeansValueColumn) {
+  db.exec('ALTER TABLE games ADD COLUMN beans_value REAL');
+}
 
 // Same story for `role` on `users` -- SQLite's ADD COLUMN can't carry a CHECK
 // that isn't a constant expression, so the 'user'/'admin' constraint is only
