@@ -1,50 +1,79 @@
 import { Platform, Pressable, View, Text, StyleSheet } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
+import CoinIcon from './CoinIcon';
 import { colors, radius } from '../theme';
 
-const SIZE = 76;
-const SPOT_SIZE = 9;
-const SPOT_COUNT = 8;
-const SPOT_RADIUS = SIZE / 2 - SPOT_SIZE / 2 - 3;
+const SIZE = 88;
 const CENTER = SIZE / 2;
-
-// The classic 8-spot ring printed around a casino chip's edge -- a generic,
-// non-proprietary chip motif (not tied to any specific product's artwork).
-const SPOT_OFFSETS = Array.from({ length: SPOT_COUNT }, (_, i) => {
-  const angle = (i / SPOT_COUNT) * 2 * Math.PI - Math.PI / 2;
-  return {
-    left: CENTER + SPOT_RADIUS * Math.cos(angle) - SPOT_SIZE / 2,
-    top: CENTER + SPOT_RADIUS * Math.sin(angle) - SPOT_SIZE / 2,
-  };
-});
+const RING_WIDTH = 9;
+const OUTER_R = SIZE / 2 - RING_WIDTH / 2 - 1;
+const INNER_R = SIZE / 2 - RING_WIDTH - 6;
+const RING_SEGMENTS = 18;
+const RING_CIRCUMFERENCE = 2 * Math.PI * OUTER_R;
+const RING_DASH = RING_CIRCUMFERENCE / RING_SEGMENTS / 2;
 
 const INNER_DISC = {
   positive: '#1E6B37',
   negative: '#8C2E24',
 };
 
-// A round, glossy casino-chip toggle: colored face + white edge spots when in play,
-// a flat dashed "empty slot" outline when not. The +/- badge stays at full opacity
-// either way, so positive vs. negative reads at a glance regardless of selection.
-export default function PokerChip({ label, positive, selected, onPress }) {
+// A round, glossy casino-chip toggle: colored face with a checkered white/accent
+// edge ring when in play, a flat dashed "empty slot" outline when not. The coin's
+// icon and +/- badge stay visible either way, so what it is (and positive vs.
+// negative) reads at a glance regardless of selection.
+export default function PokerChip({ coinKey, label, positive, selected, onPress }) {
   const accentColor = positive ? colors.primary : colors.danger;
+  const innerColor = INNER_DISC[positive ? 'positive' : 'negative'];
 
   return (
     <Pressable onPress={onPress} style={styles.wrap} hitSlop={6}>
-      <View style={[styles.chip, selected ? { backgroundColor: accentColor } : styles.chipOff]}>
-        {selected &&
-          SPOT_OFFSETS.map((pos, i) => <View key={i} style={[styles.spot, pos]} />)}
-        <View
-          style={[
-            styles.inner,
-            selected
-              ? { backgroundColor: INNER_DISC[positive ? 'positive' : 'negative'], borderColor: colors.white }
-              : { borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.label, selected ? styles.labelOn : styles.labelOff]} numberOfLines={3}>
+      <View style={styles.chipBox}>
+        {selected ? (
+          <Svg width={SIZE} height={SIZE} style={styles.svg}>
+            <Circle
+              cx={CENTER}
+              cy={CENTER}
+              r={OUTER_R}
+              fill={accentColor}
+              stroke={colors.white}
+              strokeWidth={RING_WIDTH}
+            />
+            <Circle
+              cx={CENTER}
+              cy={CENTER}
+              r={OUTER_R}
+              fill="none"
+              stroke={accentColor}
+              strokeWidth={RING_WIDTH}
+              strokeDasharray={`${RING_DASH} ${RING_DASH}`}
+            />
+            <Circle
+              cx={CENTER}
+              cy={CENTER}
+              r={INNER_R}
+              fill={innerColor}
+              stroke={colors.white}
+              strokeWidth={2}
+            />
+          </Svg>
+        ) : (
+          <View style={[styles.svg, styles.chipOff]}>
+            <View style={styles.innerOff} />
+          </View>
+        )}
+
+        <View style={styles.content} pointerEvents="none">
+          <CoinIcon
+            coinKey={coinKey}
+            size={26}
+            color={selected ? colors.white : colors.textMuted}
+            background={selected ? innerColor : colors.surface}
+          />
+          <Text style={[styles.label, selected ? styles.labelOn : styles.labelOff]} numberOfLines={2}>
             {label}
           </Text>
         </View>
+
         <View style={[styles.badge, { backgroundColor: accentColor }]}>
           <Text style={styles.badgeText}>{positive ? '+' : '−'}</Text>
         </View>
@@ -60,12 +89,9 @@ const styles = StyleSheet.create({
     marginRight: 10,
     marginBottom: 10,
   },
-  chip: {
+  chipBox: {
     width: SIZE,
     height: SIZE,
-    borderRadius: SIZE / 2,
-    borderWidth: 3,
-    borderColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -79,36 +105,46 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  svg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
   chipOff: {
-    backgroundColor: colors.surface,
+    width: SIZE,
+    height: SIZE,
+    borderRadius: SIZE / 2,
+    borderWidth: 3,
     borderColor: colors.border,
     borderStyle: 'dashed',
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
     ...Platform.select({
       web: { boxShadow: 'none' },
       default: { shadowOpacity: 0, elevation: 0 },
     }),
   },
-  spot: {
-    position: 'absolute',
-    width: SPOT_SIZE,
-    height: SPOT_SIZE,
-    borderRadius: SPOT_SIZE / 2,
-    backgroundColor: colors.white,
+  innerOff: {
+    width: INNER_R * 2,
+    height: INNER_R * 2,
+    borderRadius: INNER_R,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  inner: {
-    width: SIZE - 22,
-    height: SIZE - 22,
-    borderRadius: (SIZE - 22) / 2,
-    borderWidth: 2,
+  content: {
+    width: INNER_R * 2 - 6,
+    height: INNER_R * 2 - 6,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
   label: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 11.5,
+    lineHeight: 10.5,
+    marginTop: 3,
   },
   labelOn: {
     color: colors.white,

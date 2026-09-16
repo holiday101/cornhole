@@ -203,6 +203,7 @@ export default function NewGameScreen({ navigation }) {
           {positiveCoinDefs.map((c) => (
             <PokerChip
               key={c.key}
+              coinKey={c.key}
               label={c.label}
               positive
               selected={enabledCoins.includes(c.key)}
@@ -216,6 +217,7 @@ export default function NewGameScreen({ navigation }) {
           {negativeCoinDefs.map((c) => (
             <PokerChip
               key={c.key}
+              coinKey={c.key}
               label={c.label}
               positive={false}
               selected={enabledCoins.includes(c.key)}
