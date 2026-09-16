@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../components/Screen';
 import PrimaryButton from '../components/PrimaryButton';
 import Chip from '../components/Chip';
+import PokerChip from '../components/PokerChip';
 import TextField from '../components/TextField';
 import { colors, spacing, typography } from '../theme';
 import { getCourses } from '../api/courses';
 import { getContacts } from '../api/contacts';
 import { createGame } from '../api/games';
 import { ApiError } from '../api/client';
+import { COIN_TYPES } from '../logic/coins';
 
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 4;
+const ALL_COIN_KEYS = COIN_TYPES.map((c) => c.key);
+const DEFAULT_LLRR_POINT_VALUE = '0.10';
 
 function variantOptionsFor(course) {
   if (!course) {
@@ -37,7 +41,9 @@ export default function NewGameScreen({ navigation }) {
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [variant, setVariant] = useState('front9');
   const [selected, setSelected] = useState([]);
-  const [llrrPointValueInput, setLlrrPointValueInput] = useState('');
+  const [enabledCoins, setEnabledCoins] = useState(ALL_COIN_KEYS);
+  const [llrrEnabled, setLlrrEnabled] = useState(true);
+  const [llrrPointValueInput, setLlrrPointValueInput] = useState(DEFAULT_LLRR_POINT_VALUE);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -60,10 +66,6 @@ export default function NewGameScreen({ navigation }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourseId]);
 
-  useEffect(() => {
-    if (!isFourPlayers) setLlrrPointValueInput('');
-  }, [isFourPlayers]);
-
   const toggle = (id) => {
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((p) => p !== id);
@@ -72,16 +74,22 @@ export default function NewGameScreen({ navigation }) {
     });
   };
 
+  const toggleCoin = (key) => {
+    setEnabledCoins((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
   const canStart = selected.length + 1 >= MIN_PLAYERS && selected.length + 1 <= MAX_PLAYERS;
 
   const handleStart = async () => {
     setError('');
 
-    const trimmedLlrr = llrrPointValueInput.trim();
     let llrrPointValue = null;
-    if (isFourPlayers && trimmedLlrr !== '') {
+    if (isFourPlayers && llrrEnabled) {
+      const trimmedLlrr = llrrPointValueInput.trim();
       const parsed = Number(trimmedLlrr);
-      if (!Number.isFinite(parsed) || parsed < 0) {
+      if (trimmedLlrr === '' || !Number.isFinite(parsed) || parsed < 0) {
         setError('Left Left Right Right $/point must be a positive number.');
         return;
       }
@@ -95,6 +103,7 @@ export default function NewGameScreen({ navigation }) {
         variant,
         playerUserIds: selected,
         llrrPointValue,
+        enabledCoins,
       });
       navigation.replace('Scorecard', { gameId: game.id });
     } catch (e) {
@@ -103,89 +112,137 @@ export default function NewGameScreen({ navigation }) {
     }
   };
 
+  const positiveCoinDefs = COIN_TYPES.filter((c) => c.positive);
+  const negativeCoinDefs = COIN_TYPES.filter((c) => !c.positive);
+
   return (
     <Screen>
       <Text style={[typography.title, styles.title]}>New Game</Text>
 
-      <Text style={typography.label}>COURSE</Text>
-      <View style={styles.chipRow}>
-        <Chip
-          label="No Course"
-          selected={selectedCourseId === null}
-          onPress={() => setSelectedCourseId(null)}
-        />
-        {courses.map((c) => (
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={typography.label}>COURSE</Text>
+        <View style={styles.chipRow}>
           <Chip
-            key={c.id}
-            label={c.name}
-            selected={selectedCourseId === c.id}
-            onPress={() => setSelectedCourseId(c.id)}
+            label="No Course"
+            selected={selectedCourseId === null}
+            onPress={() => setSelectedCourseId(null)}
           />
-        ))}
-      </View>
+          {courses.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.name}
+              selected={selectedCourseId === c.id}
+              onPress={() => setSelectedCourseId(c.id)}
+            />
+          ))}
+        </View>
 
-      <Text style={[typography.label, styles.holesLabel]}>HOLES</Text>
-      <View style={styles.chipRow}>
-        {variantOptions.map((o) => (
-          <Chip key={o.value} label={o.label} selected={variant === o.value} onPress={() => setVariant(o.value)} />
-        ))}
-      </View>
+        <Text style={[typography.label, styles.holesLabel]}>HOLES</Text>
+        <View style={styles.chipRow}>
+          {variantOptions.map((o) => (
+            <Chip key={o.value} label={o.label} selected={variant === o.value} onPress={() => setVariant(o.value)} />
+          ))}
+        </View>
 
-      <Text style={[typography.label, styles.playersLabel]}>
-        PLAYERS ({selected.length + 1}/{MAX_PLAYERS}, min {MIN_PLAYERS}) — you're always included
-      </Text>
+        <Text style={[typography.label, styles.playersLabel]}>
+          PLAYERS ({selected.length + 1}/{MAX_PLAYERS}, min {MIN_PLAYERS}) — you're always included
+        </Text>
 
-      {contacts.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>
-            No friends yet. Add someone from the Friends screen to play with them.
+        {contacts.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>
+              No friends yet. Add someone from the Friends screen to play with them.
+            </Text>
+            <PrimaryButton
+              title="Go to Friends"
+              variant="outline"
+              onPress={() => navigation.navigate('Friends')}
+              style={{ marginTop: spacing.md }}
+            />
+          </View>
+        ) : (
+          <View style={styles.contactsGrid}>
+            {contacts.map((item) => (
+              <View key={item.id} style={styles.contactItem}>
+                <Chip
+                  label={item.name}
+                  selected={selected.includes(item.id)}
+                  onPress={() => toggle(item.id)}
+                  disabled={!selected.includes(item.id) && selected.length >= MAX_PLAYERS - 1}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+
+        <Text style={[typography.label, styles.chipsLabel]}>CHIPS — TAP TO INCLUDE OR EXCLUDE</Text>
+        <Text style={styles.chipsHint}>All chips are in play by default. + rewards a good shot, − marks a bad one.</Text>
+
+        <Text style={styles.chipsSubLabel}>Positive</Text>
+        <View style={styles.chipGrid}>
+          {positiveCoinDefs.map((c) => (
+            <PokerChip
+              key={c.key}
+              label={c.label}
+              positive
+              selected={enabledCoins.includes(c.key)}
+              onPress={() => toggleCoin(c.key)}
+            />
+          ))}
+        </View>
+
+        <Text style={styles.chipsSubLabel}>Negative</Text>
+        <View style={styles.chipGrid}>
+          {negativeCoinDefs.map((c) => (
+            <PokerChip
+              key={c.key}
+              label={c.label}
+              positive={false}
+              selected={enabledCoins.includes(c.key)}
+              onPress={() => toggleCoin(c.key)}
+            />
+          ))}
+        </View>
+
+        <View
+          style={[styles.llrrBox, !isFourPlayers && styles.llrrBoxDisabled]}
+          pointerEvents={isFourPlayers ? 'auto' : 'none'}
+        >
+          <Text style={[typography.label, styles.llrrTitle]}>LEFT LEFT RIGHT RIGHT</Text>
+          <Text style={styles.llrrHint}>
+            {isFourPlayers
+              ? 'A 2v2 team side game — teams reshuffle by tee order each hole.'
+              : `Needs exactly 4 players (you have ${playerCount}).`}
           </Text>
-          <PrimaryButton
-            title="Go to Friends"
-            variant="outline"
-            onPress={() => navigation.navigate('Friends')}
-            style={{ marginTop: spacing.md }}
-          />
-        </View>
-      ) : (
-        <FlatList
-          data={contacts}
-          keyExtractor={(item) => String(item.id)}
-          numColumns={2}
-          columnWrapperStyle={{ justifyContent: 'space-between' }}
-          renderItem={({ item }) => (
-            <View style={{ flex: 1 }}>
-              <Chip
-                label={item.name}
-                selected={selected.includes(item.id)}
-                onPress={() => toggle(item.id)}
-                disabled={!selected.includes(item.id) && selected.length >= MAX_PLAYERS - 1}
-              />
-            </View>
+          <View style={styles.chipRow}>
+            <Chip label="Play" selected={llrrEnabled} onPress={() => setLlrrEnabled(true)} />
+            <Chip label="Skip" selected={!llrrEnabled} onPress={() => setLlrrEnabled(false)} />
+          </View>
+          {llrrEnabled && (
+            <TextField
+              label="$ PER POINT"
+              placeholder="e.g. 0.10"
+              value={llrrPointValueInput}
+              onChangeText={setLlrrPointValueInput}
+              keyboardType="decimal-pad"
+            />
           )}
-        />
-      )}
-
-      {isFourPlayers && (
-        <View style={styles.llrrBox}>
-          <TextField
-            label="LEFT LEFT RIGHT RIGHT — $ PER POINT (OPTIONAL)"
-            placeholder="e.g. 0.10 — leave blank to skip this game"
-            value={llrrPointValueInput}
-            onChangeText={setLlrrPointValueInput}
-            keyboardType="decimal-pad"
-          />
         </View>
-      )}
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <PrimaryButton
-        title={submitting ? 'Starting…' : 'Start Game'}
-        onPress={handleStart}
-        disabled={!canStart || submitting}
-        style={styles.startBtn}
-      />
+        <PrimaryButton
+          title={submitting ? 'Starting…' : 'Start Game'}
+          onPress={handleStart}
+          disabled={!canStart || submitting}
+          style={styles.startBtn}
+        />
+      </ScrollView>
     </Screen>
   );
 }
@@ -194,6 +251,12 @@ const styles = StyleSheet.create({
   title: {
     marginTop: spacing.md,
     marginBottom: spacing.lg,
+  },
+  body: {
+    flex: 1,
+  },
+  bodyContent: {
+    paddingBottom: spacing.lg,
   },
   chipRow: {
     flexDirection: 'row',
@@ -205,19 +268,66 @@ const styles = StyleSheet.create({
   playersLabel: {
     marginBottom: spacing.sm,
   },
+  contactsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  contactItem: {
+    width: '48%',
+    marginBottom: spacing.sm,
+  },
   emptyBox: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
   emptyText: {
     color: colors.textMuted,
     fontSize: 16,
     textAlign: 'center',
   },
+  chipsLabel: {
+    marginTop: spacing.lg,
+  },
+  chipsHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  chipsSubLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 0.3,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  chipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.sm,
+  },
   llrrBox: {
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  llrrBoxDisabled: {
+    opacity: 0.45,
+  },
+  llrrTitle: {
+    marginBottom: spacing.xs,
+  },
+  llrrHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginBottom: spacing.sm,
   },
   errorText: {
     color: colors.danger,

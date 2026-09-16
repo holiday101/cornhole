@@ -31,6 +31,14 @@ export const NEGATIVE_COINS = COIN_TYPES.filter((c) => !c.positive);
 
 const COIN_BY_KEY = Object.fromEntries(COIN_TYPES.map((c) => [c.key, c]));
 
+// Coin types selected for a game (see NewGameScreen's chip picker). `game.enabledCoins`
+// missing/non-array means "all" -- games created before chip selection existed.
+export function enabledCoinTypes(game) {
+  if (!Array.isArray(game?.enabledCoins)) return COIN_TYPES;
+  const enabled = new Set(game.enabledCoins);
+  return COIN_TYPES.filter((c) => enabled.has(c.key));
+}
+
 export function coinValue(coinKeyOrType) {
   const coin = typeof coinKeyOrType === 'string' ? COIN_BY_KEY[coinKeyOrType] : coinKeyOrType;
   return coin?.positive ? 1 : -1;

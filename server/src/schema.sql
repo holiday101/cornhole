@@ -61,7 +61,11 @@ CREATE TABLE IF NOT EXISTS games (
   completed INTEGER NOT NULL DEFAULT 0,
   -- Left Left Right Right: $ value of one point, set at creation. NULL/absent = not played
   -- this round. Only meaningful for 4-player games (enforced in the API, not here).
-  llrr_point_value REAL
+  llrr_point_value REAL,
+  -- JSON array of coin_key strings enabled for this game (see game_hole_coins below).
+  -- NULL means "all coins" -- the implicit default before this column existed, and
+  -- still the default for a game created without an explicit chip selection.
+  enabled_coins TEXT
 );
 
 CREATE TABLE IF NOT EXISTS game_players (

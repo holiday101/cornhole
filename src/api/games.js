@@ -8,12 +8,13 @@ export function getGame(id) {
   return api.get(`/games/${id}`);
 }
 
-export function createGame({ courseId, variant, playerUserIds, llrrPointValue }) {
+export function createGame({ courseId, variant, playerUserIds, llrrPointValue, enabledCoins }) {
   return api.post('/games', {
     courseId: courseId ?? null,
     variant,
     playerUserIds,
     llrrPointValue: llrrPointValue ?? null,
+    enabledCoins: enabledCoins ?? null,
   });
 }
 

@@ -22,5 +22,9 @@ const hasLlrrColumn = gameColumns.some((col) => col.name === 'llrr_point_value')
 if (!hasLlrrColumn) {
   db.exec('ALTER TABLE games ADD COLUMN llrr_point_value REAL');
 }
+const hasEnabledCoinsColumn = gameColumns.some((col) => col.name === 'enabled_coins');
+if (!hasEnabledCoinsColumn) {
+  db.exec('ALTER TABLE games ADD COLUMN enabled_coins TEXT');
+}
 
 module.exports = db;

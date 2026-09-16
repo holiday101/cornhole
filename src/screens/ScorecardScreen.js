@@ -16,7 +16,7 @@ import {
   setCompleted,
 } from '../api/games';
 import { computeHoleWinners } from '../logic/beans';
-import { computeCoinHolders, POSITIVE_COINS, NEGATIVE_COINS } from '../logic/coins';
+import { computeCoinHolders, enabledCoinTypes } from '../logic/coins';
 import { computeHoleResult } from '../logic/llrr';
 
 const BEAN_FIELDS = [
@@ -129,6 +129,9 @@ export default function ScorecardScreen({ route, navigation }) {
 
   const coinHolderStates = computeCoinHolders(game.holes);
   const currentCoinHolders = coinHolderStates[holeIndex] || {};
+  const gameCoinTypes = enabledCoinTypes(game);
+  const positiveCoins = gameCoinTypes.filter((c) => c.positive);
+  const negativeCoins = gameCoinTypes.filter((c) => !c.positive);
 
   const llrrEnabled =
     game.playerIds.length === 4 && game.llrrPointValue !== null && game.llrrPointValue !== undefined;
@@ -282,94 +285,6 @@ export default function ScorecardScreen({ route, navigation }) {
           )}
         </View>
 
-        {BEAN_FIELDS.map((field) => (
-          <View key={field.key} style={styles.beanSection}>
-            <Text style={styles.beanLabel}>{field.label}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipRow}
-            >
-              {game.playerIds.map((pid) => (
-                <Chip
-                  key={pid}
-                  label={playerMap[pid] || 'Unknown'}
-                  selected={hole.beans[field.key] === pid}
-                  onPress={() => setBean(field.key, pid)}
-                  color={colors.accent}
-                  compact
-                />
-              ))}
-            </ScrollView>
-          </View>
-        ))}
-
-        <View style={styles.coinsGroup}>
-          <Text style={styles.coinsGroupLabel}>COINS — POSITIVE ($1 each)</Text>
-          {POSITIVE_COINS.map((coin) => {
-            const holderId = currentCoinHolders[coin.key];
-            return (
-              <View key={coin.key} style={styles.coinSection}>
-                <View style={styles.coinLabelRow}>
-                  <Text style={styles.coinLabel}>{coin.label}</Text>
-                  <Text style={styles.coinHolder} numberOfLines={1}>
-                    {holderId ? `held by ${playerMap[holderId] || 'Unknown'}` : 'unclaimed'}
-                  </Text>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chipRow}
-                >
-                  {game.playerIds.map((pid) => (
-                    <Chip
-                      key={pid}
-                      label={playerMap[pid] || 'Unknown'}
-                      selected={hole.coins?.[coin.key] === pid}
-                      onPress={() => setCoinTag(coin.key, pid)}
-                      color={colors.primary}
-                      compact
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            );
-          })}
-        </View>
-
-        <View style={styles.coinsGroup}>
-          <Text style={styles.coinsGroupLabel}>COINS — NEGATIVE ($1 each)</Text>
-          {NEGATIVE_COINS.map((coin) => {
-            const holderId = currentCoinHolders[coin.key];
-            return (
-              <View key={coin.key} style={styles.coinSection}>
-                <View style={styles.coinLabelRow}>
-                  <Text style={styles.coinLabel}>{coin.label}</Text>
-                  <Text style={styles.coinHolder} numberOfLines={1}>
-                    {holderId ? `held by ${playerMap[holderId] || 'Unknown'}` : 'unclaimed'}
-                  </Text>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chipRow}
-                >
-                  {game.playerIds.map((pid) => (
-                    <Chip
-                      key={pid}
-                      label={playerMap[pid] || 'Unknown'}
-                      selected={hole.coins?.[coin.key] === pid}
-                      onPress={() => setCoinTag(coin.key, pid)}
-                      color={colors.danger}
-                      compact
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            );
-          })}
-        </View>
-
         {llrrEnabled && (
           <View style={styles.coinsGroup}>
             <Text style={styles.coinsGroupLabel}>LEFT LEFT RIGHT RIGHT — TEE ORDER</Text>
@@ -416,6 +331,98 @@ export default function ScorecardScreen({ route, navigation }) {
                 </Text>
               )}
             </View>
+          </View>
+        )}
+
+        {BEAN_FIELDS.map((field) => (
+          <View key={field.key} style={styles.beanSection}>
+            <Text style={styles.beanLabel}>{field.label}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
+            >
+              {game.playerIds.map((pid) => (
+                <Chip
+                  key={pid}
+                  label={playerMap[pid] || 'Unknown'}
+                  selected={hole.beans[field.key] === pid}
+                  onPress={() => setBean(field.key, pid)}
+                  color={colors.accent}
+                  compact
+                />
+              ))}
+            </ScrollView>
+          </View>
+        ))}
+
+        {positiveCoins.length > 0 && (
+          <View style={styles.coinsGroup}>
+            <Text style={styles.coinsGroupLabel}>COINS — POSITIVE ($1 each)</Text>
+            {positiveCoins.map((coin) => {
+              const holderId = currentCoinHolders[coin.key];
+              return (
+                <View key={coin.key} style={styles.coinSection}>
+                  <View style={styles.coinLabelRow}>
+                    <Text style={styles.coinLabel}>{coin.label}</Text>
+                    <Text style={styles.coinHolder} numberOfLines={1}>
+                      {holderId ? `held by ${playerMap[holderId] || 'Unknown'}` : 'unclaimed'}
+                    </Text>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chipRow}
+                  >
+                    {game.playerIds.map((pid) => (
+                      <Chip
+                        key={pid}
+                        label={playerMap[pid] || 'Unknown'}
+                        selected={hole.coins?.[coin.key] === pid}
+                        onPress={() => setCoinTag(coin.key, pid)}
+                        color={colors.primary}
+                        compact
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {negativeCoins.length > 0 && (
+          <View style={styles.coinsGroup}>
+            <Text style={styles.coinsGroupLabel}>COINS — NEGATIVE ($1 each)</Text>
+            {negativeCoins.map((coin) => {
+              const holderId = currentCoinHolders[coin.key];
+              return (
+                <View key={coin.key} style={styles.coinSection}>
+                  <View style={styles.coinLabelRow}>
+                    <Text style={styles.coinLabel}>{coin.label}</Text>
+                    <Text style={styles.coinHolder} numberOfLines={1}>
+                      {holderId ? `held by ${playerMap[holderId] || 'Unknown'}` : 'unclaimed'}
+                    </Text>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chipRow}
+                  >
+                    {game.playerIds.map((pid) => (
+                      <Chip
+                        key={pid}
+                        label={playerMap[pid] || 'Unknown'}
+                        selected={hole.coins?.[coin.key] === pid}
+                        onPress={() => setCoinTag(coin.key, pid)}
+                        color={colors.danger}
+                        compact
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              );
+            })}
           </View>
         )}
       </ScrollView>

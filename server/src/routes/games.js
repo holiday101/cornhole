@@ -35,8 +35,24 @@ const COIN_KEYS = new Set([
   'score_8',
 ]);
 
+const ALL_COIN_KEYS = Array.from(COIN_KEYS);
+
 const LLRR_PLAYER_COUNT = 4;
 const LLRR_POSITIONS = [1, 2, 3, 4];
+
+// games.enabled_coins is a JSON array of coin_key strings, or NULL for "all coins"
+// (both a brand-new game with no explicit selection, and every game created before
+// this column existed).
+function parseEnabledCoins(gameRow) {
+  if (!gameRow.enabled_coins) return ALL_COIN_KEYS;
+  try {
+    const parsed = JSON.parse(gameRow.enabled_coins);
+    if (Array.isArray(parsed) && parsed.every((k) => COIN_KEYS.has(k))) return parsed;
+  } catch (e) {
+    // fall through to the default below
+  }
+  return ALL_COIN_KEYS;
+}
 
 function holeNumbersForVariant(variant) {
   const [start, end] = VARIANT_RANGES[variant];
@@ -132,11 +148,19 @@ function loadFullGame(gameId) {
     holes,
     // $ value of one Left Left Right Right point for this game, or null if not played.
     llrrPointValue: game.llrr_point_value,
+    // Which coin_key values are in play for this game (see COIN_TYPES in src/logic/coins.js).
+    enabledCoins: parseEnabledCoins(game),
   };
 }
 
 router.post('/games', requireAuth, (req, res) => {
-  const { courseId, variant, playerUserIds, llrrPointValue: rawLlrrPointValue } = req.body || {};
+  const {
+    courseId,
+    variant,
+    playerUserIds,
+    llrrPointValue: rawLlrrPointValue,
+    enabledCoins: rawEnabledCoins,
+  } = req.body || {};
 
   if (!Object.prototype.hasOwnProperty.call(VARIANT_RANGES, variant)) {
     return res.status(400).json({ error: 'variant must be front9, back9, or full18' });
@@ -180,6 +204,16 @@ router.post('/games', requireAuth, (req, res) => {
     llrrPointValue = parsed;
   }
 
+  // Omitting enabledCoins (or sending something malformed) plays every coin type --
+  // the same "everything on" default the app used before chip selection existed.
+  let enabledCoins = ALL_COIN_KEYS;
+  if (Array.isArray(rawEnabledCoins)) {
+    if (rawEnabledCoins.some((k) => !COIN_KEYS.has(k))) {
+      return res.status(400).json({ error: 'enabledCoins contains an unknown coin key' });
+    }
+    enabledCoins = Array.from(new Set(rawEnabledCoins));
+  }
+
   const holeNumbers = holeNumbersForVariant(variant);
   const parByHole = {};
   if (course) {
@@ -190,7 +224,8 @@ router.post('/games', requireAuth, (req, res) => {
   }
 
   const insertGame = db.prepare(
-    'INSERT INTO games (creator_user_id, course_id, variant, holes_count, llrr_point_value) VALUES (?, ?, ?, ?, ?)'
+    `INSERT INTO games (creator_user_id, course_id, variant, holes_count, llrr_point_value, enabled_coins)
+     VALUES (?, ?, ?, ?, ?, ?)`
   );
   const insertPlayer = db.prepare(
     'INSERT INTO game_players (game_id, user_id, sort_order) VALUES (?, ?, ?)'
@@ -208,7 +243,8 @@ router.post('/games', requireAuth, (req, res) => {
       course ? course.id : null,
       variant,
       holeNumbers.length,
-      llrrPointValue
+      llrrPointValue,
+      JSON.stringify(enabledCoins)
     );
     const newGameId = info.lastInsertRowid;
 
@@ -297,6 +333,9 @@ router.patch('/games/:id/holes/:n/beans', requireAuth, requireParticipant, (req,
 router.patch('/games/:id/holes/:n/coins', requireAuth, requireParticipant, (req, res) => {
   const { coinKey, userId } = req.body || {};
   if (!COIN_KEYS.has(coinKey)) return res.status(400).json({ error: 'Unknown coinKey' });
+  if (!parseEnabledCoins(req.game).includes(coinKey)) {
+    return res.status(400).json({ error: 'That coin is not enabled for this game' });
+  }
   const holeNumber = Number(req.params.n);
   const resolvedUserId = userId === undefined ? null : userId;
 
