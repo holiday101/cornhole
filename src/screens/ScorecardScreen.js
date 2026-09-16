@@ -381,6 +381,9 @@ export default function ScorecardScreen({ route, navigation }) {
                     <View style={[styles.coinIconBadge, { backgroundColor: colors.primary }]}>
                       <CoinIcon coinKey={coin.key} size={18} color={colors.white} />
                     </View>
+                    <Text style={styles.coinLabel} numberOfLines={2}>
+                      {coin.label}
+                    </Text>
                     <PlayerDropdown
                       value={holderId}
                       options={game.playerIds.map((pid) => ({ id: pid, name: playerMap[pid] || 'Unknown' }))}
@@ -405,6 +408,9 @@ export default function ScorecardScreen({ route, navigation }) {
                     <View style={[styles.coinIconBadge, { backgroundColor: colors.danger }]}>
                       <CoinIcon coinKey={coin.key} size={18} color={colors.white} />
                     </View>
+                    <Text style={styles.coinLabel} numberOfLines={2}>
+                      {coin.label}
+                    </Text>
                     <PlayerDropdown
                       value={holderId}
                       options={game.playerIds.map((pid) => ({ id: pid, name: playerMap[pid] || 'Unknown' }))}
@@ -584,6 +590,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  coinLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+    marginLeft: spacing.sm,
+    width: 84,
   },
   chipRow: {
     flexDirection: 'row',
