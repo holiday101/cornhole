@@ -18,13 +18,6 @@ const BEAN_COLUMNS = [
   { key: 'holeWinner', label: 'Holes' },
 ];
 
-function formatMoney(amount) {
-  const abs = Math.abs(amount).toFixed(2);
-  if (amount > 0.005) return `+$${abs}`;
-  if (amount < -0.005) return `-$${abs}`;
-  return '$0.00';
-}
-
 export default function GameSummaryScreen({ route, navigation }) {
   const { gameId } = route.params;
   const [game, setGame] = useState(null);
@@ -187,37 +180,32 @@ export default function GameSummaryScreen({ route, navigation }) {
                 );
               })}
             </View>
+
+            {llrrSummary.settleUp.length > 0 && (
+              <>
+                <Text style={[typography.label, styles.sectionLabel]}>LLRR SETTLE UP</Text>
+                <View style={styles.card}>
+                  {llrrSummary.settleUp.map((t, i) => (
+                    <View
+                      key={`llrr-${t.fromId}-${t.toId}`}
+                      style={[styles.settleRow, i === 0 && styles.leaderRowFirst]}
+                    >
+                      <Text style={styles.settleText}>
+                        {(playerMap[t.fromId] || 'Unknown') + ' owes ' + (playerMap[t.toId] || 'Unknown')}
+                      </Text>
+                      <Text style={styles.settleAmount}>${t.amount.toFixed(2)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
           </>
         )}
 
-        <Text style={[typography.label, styles.sectionLabel]}>TOTAL OWED</Text>
-        <View style={styles.card}>
-          <View style={styles.tableHeaderRow}>
-            <Text style={[styles.tableCell, styles.tableNameCell, styles.tableHeaderText]}>
-              Player
-            </Text>
-            <Text style={[styles.tableCell, styles.tableHeaderText]}>Coins</Text>
-            {beansEnabled && (
-              <Text style={[styles.tableCell, styles.tableHeaderText]}>Beans</Text>
-            )}
-            {llrrEnabled && (
-              <Text style={[styles.tableCell, styles.tableHeaderText]}>LLRR</Text>
-            )}
-            <Text style={[styles.tableCell, styles.tableHeaderText]}>Total</Text>
-          </View>
-          {totalOwed.byPlayer.map((p) => (
-            <View key={p.id} style={styles.tableRow}>
-              <Text style={[styles.tableCell, styles.tableNameCell]} numberOfLines={1}>
-                {playerMap[p.id] || 'Unknown'}
-              </Text>
-              <Text style={styles.tableCell}>{formatMoney(p.coins)}</Text>
-              {beansEnabled && <Text style={styles.tableCell}>{formatMoney(p.beans)}</Text>}
-              {llrrEnabled && <Text style={styles.tableCell}>{formatMoney(p.llrr || 0)}</Text>}
-              <Text style={[styles.tableCell, styles.tableTotalText]}>{formatMoney(p.total)}</Text>
-            </View>
-          ))}
-          {totalOwed.settleUp.length > 0 && (
-            <View style={styles.totalOwedSettle}>
+        {totalOwed.settleUp.length > 0 && (
+          <>
+            <Text style={[typography.label, styles.sectionLabel]}>COINS + BEANS OWED</Text>
+            <View style={styles.card}>
               {totalOwed.settleUp.map((t, i) => (
                 <View
                   key={`total-${t.fromId}-${t.toId}`}
@@ -230,8 +218,8 @@ export default function GameSummaryScreen({ route, navigation }) {
                 </View>
               ))}
             </View>
-          )}
-        </View>
+          </>
+        )}
 
         <Text style={[typography.label, styles.sectionLabel]}>HOLE BY HOLE</Text>
         <View style={styles.card}>
@@ -393,12 +381,6 @@ const styles = StyleSheet.create({
   },
   coinNetNegative: {
     color: colors.danger,
-  },
-  totalOwedSettle: {
-    marginTop: spacing.xs,
-    paddingTop: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
   },
   settleRow: {
     flexDirection: 'row',
