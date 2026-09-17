@@ -221,6 +221,25 @@ export default function GameSummaryScreen({ route, navigation }) {
           </>
         )}
 
+        {totalOwed.grandTotal.length > 0 && (
+          <>
+            <Text style={[typography.label, styles.sectionLabel]}>TOTAL OWED</Text>
+            <View style={styles.card}>
+              {totalOwed.grandTotal.map((t, i) => (
+                <View
+                  key={`grand-${t.fromId}-${t.toId}`}
+                  style={[styles.settleRow, i === 0 && styles.leaderRowFirst]}
+                >
+                  <Text style={styles.settleText}>
+                    {(playerMap[t.fromId] || 'Unknown') + ' owes ' + (playerMap[t.toId] || 'Unknown')}
+                  </Text>
+                  <Text style={styles.settleAmount}>${t.amount.toFixed(2)}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
         <Text style={[typography.label, styles.sectionLabel]}>HOLE BY HOLE</Text>
         <View style={styles.card}>
           {game.holes.map((hole, i) => {
