@@ -7,6 +7,7 @@ import { getGame } from '../api/games';
 import { summarizeBeans, totalScore } from '../logic/beans';
 import { summarizeCoins, COIN_TYPES } from '../logic/coins';
 import { summarizeLLRR } from '../logic/llrr';
+import { summarizeTotalOwed } from '../logic/totals';
 
 const COIN_LABELS = Object.fromEntries(COIN_TYPES.map((c) => [c.key, c]));
 
@@ -47,6 +48,7 @@ export default function GameSummaryScreen({ route, navigation }) {
   const llrrEnabled =
     game.playerIds.length === 4 && game.llrrPointValue !== null && game.llrrPointValue !== undefined;
   const llrrSummary = llrrEnabled ? summarizeLLRR(game) : null;
+  const totalOwed = summarizeTotalOwed(game);
 
   const leaderboard = game.playerIds
     .map((pid) => ({
@@ -81,6 +83,42 @@ export default function GameSummaryScreen({ route, navigation }) {
               <Text style={styles.leaderBeans}>🫘 {p.beans}</Text>
             </View>
           ))}
+        </View>
+
+        <Text style={[typography.label, styles.sectionLabel]}>TOTAL OWED</Text>
+        <View style={styles.card}>
+          {game.playerIds.map((pid, i) => {
+            const net = totalOwed.net[pid] || 0;
+            return (
+              <View key={pid} style={[styles.leaderRow, i === 0 && styles.leaderRowFirst]}>
+                <Text style={styles.leaderName}>{playerMap[pid] || 'Unknown'}</Text>
+                <Text
+                  style={[
+                    styles.coinNetText,
+                    net > 0 && styles.coinNetPositive,
+                    net < 0 && styles.coinNetNegative,
+                  ]}
+                >
+                  {net > 0 ? `+$${net.toFixed(2)}` : net < 0 ? `-$${Math.abs(net).toFixed(2)}` : '$0.00'}
+                </Text>
+              </View>
+            );
+          })}
+          {totalOwed.settleUp.length > 0 && (
+            <View style={styles.totalOwedSettle}>
+              {totalOwed.settleUp.map((t, i) => (
+                <View
+                  key={`total-${t.fromId}-${t.toId}`}
+                  style={[styles.settleRow, i === 0 && styles.leaderRowFirst]}
+                >
+                  <Text style={styles.settleText}>
+                    {(playerMap[t.fromId] || 'Unknown') + ' owes ' + (playerMap[t.toId] || 'Unknown')}
+                  </Text>
+                  <Text style={styles.settleAmount}>${t.amount.toFixed(2)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <Text style={[typography.label, styles.sectionLabel]}>BEAN BREAKDOWN</Text>
@@ -390,6 +428,12 @@ const styles = StyleSheet.create({
   },
   coinNetNegative: {
     color: colors.danger,
+  },
+  totalOwedSettle: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   settleRow: {
     flexDirection: 'row',
