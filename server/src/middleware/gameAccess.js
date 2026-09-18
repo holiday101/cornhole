@@ -21,7 +21,7 @@ function requireParticipant(req, res, next) {
 
 function requireCreator(req, res, next) {
   loadGame(req, res, () => {
-    if (req.game.creator_user_id !== req.user.id) {
+    if (req.game.creator_user_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only the game creator can do this' });
     }
     next();

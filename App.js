@@ -19,6 +19,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import AdminUsersScreen from './src/screens/AdminUsersScreen';
 import AdminUserEditScreen from './src/screens/AdminUserEditScreen';
+import AdminGamesScreen from './src/screens/AdminGamesScreen';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { colors } from './src/theme';
 
@@ -101,6 +102,11 @@ function AppNavigator() {
                   name="AdminUserEdit"
                   component={AdminUserEditScreen}
                   options={{ title: 'Edit Person' }}
+                />
+                <Stack.Screen
+                  name="AdminGames"
+                  component={AdminGamesScreen}
+                  options={{ title: 'Manage Games' }}
                 />
               </>
             )}

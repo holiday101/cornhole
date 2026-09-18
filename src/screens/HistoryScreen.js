@@ -59,7 +59,7 @@ export default function HistoryScreen({ navigation }) {
         }
         renderItem={({ item }) => {
           const names = item.players.map((p) => p.name).join(', ');
-          const canDelete = item.creatorUserId === user.id;
+          const canDelete = item.creatorUserId === user.id || user.role === 'admin';
           const dateLabel = new Date(item.date).toLocaleDateString(undefined, {
             month: 'short',
             day: 'numeric',

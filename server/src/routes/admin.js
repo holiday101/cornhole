@@ -141,4 +141,26 @@ router.delete('/admin/users/:id', (req, res) => {
   res.status(204).end();
 });
 
+// Every game in the system, regardless of who created it or is playing in it --
+// HistoryScreen only shows a user's own games, so an admin needs this to find and
+// delete a game they aren't a participant in.
+router.get('/admin/games', (req, res) => {
+  const games = db
+    .prepare(
+      `SELECT g.id, g.date, g.completed, g.variant, g.holes_count, c.name AS course_name,
+              (SELECT GROUP_CONCAT(name, ', ') FROM (
+                 SELECT u.name FROM game_players gp
+                 JOIN users u ON u.id = gp.user_id
+                 WHERE gp.game_id = g.id
+                 ORDER BY gp.sort_order
+               )) AS player_names
+       FROM games g
+       LEFT JOIN courses c ON c.id = g.course_id
+       ORDER BY g.date DESC`
+    )
+    .all()
+    .map((g) => ({ ...g, completed: !!g.completed }));
+  res.json({ games });
+});
+
 module.exports = router;

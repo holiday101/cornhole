@@ -15,3 +15,7 @@ export function deleteUser(userId) {
 export function updateUser(userId, { name, email }) {
   return api.patch(`/admin/users/${userId}`, { name, email });
 }
+
+export function getAdminGames() {
+  return api.get('/admin/games');
+}
