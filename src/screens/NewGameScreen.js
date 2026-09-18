@@ -8,7 +8,7 @@ import PokerChip from '../components/PokerChip';
 import TextField from '../components/TextField';
 import { colors, spacing, typography } from '../theme';
 import { getCourses } from '../api/courses';
-import { getContacts } from '../api/contacts';
+import { getPeople } from '../api/people';
 import { createGame } from '../api/games';
 import { ApiError } from '../api/client';
 import { COIN_TYPES } from '../logic/coins';
@@ -38,7 +38,8 @@ function variantOptionsFor(course) {
 
 export default function NewGameScreen({ navigation }) {
   const [courses, setCourses] = useState([]);
-  const [contacts, setContacts] = useState([]);
+  const [people, setPeople] = useState([]);
+  const [playerSearch, setPlayerSearch] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [variant, setVariant] = useState('front9');
   const [selected, setSelected] = useState([]);
@@ -53,7 +54,7 @@ export default function NewGameScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       getCourses().then(({ courses: list }) => setCourses(list));
-      getContacts().then(({ contacts: list }) => setContacts(list));
+      getPeople().then(({ people: list }) => setPeople(list));
     }, [])
   );
 
@@ -61,6 +62,16 @@ export default function NewGameScreen({ navigation }) {
   const variantOptions = variantOptionsFor(selectedCourse);
   const playerCount = selected.length + 1;
   const isFourPlayers = playerCount === MAX_PLAYERS;
+
+  // Favorites plus anyone already picked stay pinned as chips; the search
+  // box below is only for finding someone else in the wider directory.
+  const pinnedPeople = people.filter((p) => p.isFavorite || selected.includes(p.id));
+  const trimmedPlayerSearch = playerSearch.trim().toLowerCase();
+  const searchResults = trimmedPlayerSearch
+    ? people
+        .filter((p) => !p.isFavorite && !selected.includes(p.id))
+        .filter((p) => p.name.toLowerCase().includes(trimmedPlayerSearch))
+    : [];
 
   useEffect(() => {
     if (!variantOptions.some((o) => o.value === variant)) {
@@ -168,13 +179,13 @@ export default function NewGameScreen({ navigation }) {
           PLAYERS ({selected.length + 1}/{MAX_PLAYERS}, min {MIN_PLAYERS}) — you're always included
         </Text>
 
-        {contacts.length === 0 ? (
+        {pinnedPeople.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyText}>
-              No friends yet. Add someone from the Friends screen to play with them.
+              No favorites yet. Star some regulars on the People screen, or search below.
             </Text>
             <PrimaryButton
-              title="Go to Friends"
+              title="Go to People"
               variant="outline"
               onPress={() => navigation.navigate('Friends')}
               style={{ marginTop: spacing.md }}
@@ -182,13 +193,37 @@ export default function NewGameScreen({ navigation }) {
           </View>
         ) : (
           <View style={styles.contactsGrid}>
-            {contacts.map((item) => (
+            {pinnedPeople.map((item) => (
               <View key={item.id} style={styles.contactItem}>
                 <Chip
                   label={item.name}
                   selected={selected.includes(item.id)}
                   onPress={() => toggle(item.id)}
                   disabled={!selected.includes(item.id) && selected.length >= MAX_PLAYERS - 1}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+
+        <TextField
+          label="FIND SOMEONE ELSE"
+          placeholder="Search everyone"
+          value={playerSearch}
+          onChangeText={setPlayerSearch}
+        />
+        {searchResults.length > 0 && (
+          <View style={[styles.contactsGrid, styles.searchResultsGrid]}>
+            {searchResults.map((item) => (
+              <View key={item.id} style={styles.contactItem}>
+                <Chip
+                  label={item.name}
+                  selected={false}
+                  disabled={selected.length >= MAX_PLAYERS - 1}
+                  onPress={() => {
+                    toggle(item.id);
+                    setPlayerSearch('');
+                  }}
                 />
               </View>
             ))}
@@ -313,6 +348,9 @@ const styles = StyleSheet.create({
   contactItem: {
     width: '48%',
     marginBottom: spacing.sm,
+  },
+  searchResultsGrid: {
+    marginTop: spacing.sm,
   },
   emptyBox: {
     alignItems: 'center',

@@ -17,6 +17,7 @@ export default function SignupScreen({ navigation }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
 
   const validate = () => {
     if (!name.trim()) return 'Enter your name.';
@@ -35,13 +36,35 @@ export default function SignupScreen({ navigation }) {
     setError('');
     setSubmitting(true);
     try {
-      await signup({ email: email.trim(), password, name: name.trim() });
+      const result = await signup({ email: email.trim(), password, name: name.trim() });
+      if (result && result.pendingVerification) {
+        setPendingVerificationEmail(result.email);
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Something went wrong. Try again.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (pendingVerificationEmail) {
+    return (
+      <Screen>
+        <View style={styles.content}>
+          <Text style={[typography.title, styles.title]}>Check your email</Text>
+          <Text style={styles.subtitle}>
+            Someone already added {pendingVerificationEmail} to the app. We sent a verification
+            link there — tap it to finish setting up your account, then come back and log in.
+          </Text>
+          <Pressable onPress={() => navigation.navigate('Login')} style={styles.linkRow}>
+            <Text style={styles.linkText}>
+              <Text style={styles.linkTextBold}>Back to log in</Text>
+            </Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

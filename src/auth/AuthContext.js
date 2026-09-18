@@ -27,9 +27,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signup = useCallback(async ({ email, password, name }) => {
-    const { token, user: newUser } = await authApi.signup({ email, password, name });
-    await setToken(token);
-    setUser(newUser);
+    const result = await authApi.signup({ email, password, name });
+    // Claiming a placeholder someone already added requires verifying the
+    // email before login works -- there's no token/user yet in that case.
+    if (result.pendingVerification) return result;
+    await setToken(result.token);
+    setUser(result.user);
+    return result;
   }, []);
 
   const login = useCallback(async ({ email, password }) => {

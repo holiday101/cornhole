@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { requireParticipant, requireCreator } = require('../middleware/gameAccess');
-const { addContactPair } = require('./contacts');
+const { addFavoritePair } = require('./people');
 
 const router = express.Router();
 
@@ -285,7 +285,7 @@ router.post('/games', requireAuth, (req, res) => {
     }
 
     for (const userId of participantIds) {
-      if (userId !== req.user.id) addContactPair(req.user.id, userId);
+      if (userId !== req.user.id) addFavoritePair(req.user.id, userId);
     }
 
     return newGameId;

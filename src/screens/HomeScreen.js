@@ -25,7 +25,7 @@ export default function HomeScreen({ navigation }) {
           style={styles.spaced}
         />
         <PrimaryButton
-          title="Friends"
+          title="People"
           variant="outline"
           onPress={() => navigation.navigate('Friends')}
           style={styles.spaced}

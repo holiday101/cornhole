@@ -1,11 +1,18 @@
 PRAGMA foreign_keys = ON;
 
+-- Doubles as the global people directory: a row with claimed_at IS NULL is a
+-- placeholder someone added by name+email who hasn't signed up yet (no
+-- password_hash, can't log in, but is a real, listable, playable person --
+-- referenceable from game_players etc like anyone else). Signing up with a
+-- matching email claims the existing row in place rather than creating a new
+-- one, so history/favorites already attached to it stay correct.
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
+  password_hash TEXT NOT NULL DEFAULT '',
   name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+  claimed_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -17,24 +24,25 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 
--- someone tried to add a friend by email before that person had an
--- account; resolved (and deleted) the moment that email signs up.
-CREATE TABLE IF NOT EXISTS pending_invites (
-  email TEXT NOT NULL,
-  invited_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (email, invited_by_user_id)
+-- Claiming a placeholder row (or signing up fresh) requires proving email
+-- ownership before claimed_at is set and login is allowed.
+CREATE TABLE IF NOT EXISTS email_verifications (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_pending_invites_email ON pending_invites(email);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_user ON email_verifications(user_id);
 
--- symmetric relationship: always stored with user_a_id < user_b_id
-CREATE TABLE IF NOT EXISTS contacts (
-  user_a_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  user_b_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+-- One-directional: a personal pick from the shared directory. Not mutual --
+-- me favoriting you doesn't favorite you back.
+CREATE TABLE IF NOT EXISTS favorites (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  favorite_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (user_a_id, user_b_id),
-  CHECK (user_a_id < user_b_id)
+  PRIMARY KEY (user_id, favorite_id),
+  CHECK (user_id != favorite_id)
 );
+CREATE INDEX IF NOT EXISTS idx_favorites_favorite ON favorites(favorite_id);
 
 -- shared/global: a friend group plays the same physical course
 CREATE TABLE IF NOT EXISTS courses (

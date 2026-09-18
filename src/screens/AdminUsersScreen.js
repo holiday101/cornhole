@@ -96,15 +96,22 @@ export default function AdminUsersScreen({ navigation }) {
               </View>
               <Text style={styles.email}>{item.email}</Text>
               <Text style={styles.meta}>
-                {item.games_played} games · {item.courses_created} courses · {item.friend_count} friends
+                {item.is_placeholder ? 'Not yet signed up · ' : ''}
+                {item.games_played} games · {item.courses_created} courses · {item.favorite_count} favorited them
               </Text>
 
               <View style={styles.actions}>
                 <Pressable
-                  onPress={() => navigation.navigate('AdminUserFriends', { userId: item.id, userName: item.name })}
+                  onPress={() =>
+                    navigation.navigate('AdminUserEdit', {
+                      userId: item.id,
+                      userName: item.name,
+                      userEmail: item.email,
+                    })
+                  }
                   style={[styles.actionBtn, styles.roleBtn]}
                 >
-                  <Text style={styles.roleBtnText}>Friends</Text>
+                  <Text style={styles.roleBtnText}>Edit</Text>
                 </Pressable>
                 {!isSelf && (
                   <>

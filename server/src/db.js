@@ -41,4 +41,66 @@ if (!hasRoleColumn) {
   db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
 }
 
+// Friends/directory redesign: `claimed_at` marks a real, logged-in-capable
+// account (vs a placeholder person someone added by name+email). Every
+// pre-existing row already has a password and has been logging in fine, so
+// it backfills to `created_at` in the same migration that adds the column --
+// this only runs once, the moment the column doesn't exist yet.
+const hasClaimedAtColumn = userColumns.some((col) => col.name === 'claimed_at');
+if (!hasClaimedAtColumn) {
+  db.exec('ALTER TABLE users ADD COLUMN claimed_at TEXT');
+  db.exec('UPDATE users SET claimed_at = created_at WHERE claimed_at IS NULL');
+}
+
+// Old `contacts` (mutual friends) -> new one-directional `favorites`: each
+// existing pair becomes two rows so nobody's favorites list goes empty.
+// Guarded purely by the table's existence, so it's a no-op after the first
+// run once `contacts` has been dropped.
+const hasContactsTable = db
+  .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contacts'")
+  .get();
+if (hasContactsTable) {
+  db.exec(`
+    INSERT OR IGNORE INTO favorites (user_id, favorite_id)
+    SELECT user_a_id, user_b_id FROM contacts
+    UNION ALL
+    SELECT user_b_id, user_a_id FROM contacts
+  `);
+  db.exec('DROP TABLE contacts');
+}
+
+// Old `pending_invites` (email-only, invisible until signup) -> a real
+// placeholder `users` row per invited email, immediately listable in the
+// directory and favorited for whoever invited them. Names weren't captured
+// before, so the placeholder starts out named from the email's local part;
+// an admin can rename it via PATCH /admin/users/:id.
+const hasPendingInvitesTable = db
+  .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pending_invites'")
+  .get();
+if (hasPendingInvitesTable) {
+  const migratePendingInvites = db.transaction(() => {
+    const invites = db.prepare('SELECT email, invited_by_user_id FROM pending_invites').all();
+    for (const invite of invites) {
+      let placeholder = db.prepare('SELECT id FROM users WHERE email = ?').get(invite.email);
+      if (!placeholder) {
+        const guessedName = invite.email.split('@')[0];
+        // password_hash is spelled out (rather than relying on schema.sql's
+        // DEFAULT '') because a pre-existing `users` table on a real database
+        // keeps its original NOT NULL-with-no-default column definition --
+        // CREATE TABLE IF NOT EXISTS can't retrofit it.
+        const info = db
+          .prepare("INSERT INTO users (email, name, password_hash) VALUES (?, ?, '')")
+          .run(invite.email, guessedName);
+        placeholder = { id: info.lastInsertRowid };
+      }
+      db.prepare('INSERT OR IGNORE INTO favorites (user_id, favorite_id) VALUES (?, ?)').run(
+        invite.invited_by_user_id,
+        placeholder.id
+      );
+    }
+    db.exec('DROP TABLE pending_invites');
+  });
+  migratePendingInvites();
+}
+
 module.exports = db;

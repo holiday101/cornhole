@@ -1,7 +1,7 @@
 const express = require('express');
 
 const authRoutes = require('./routes/auth');
-const { router: contactsRoutes } = require('./routes/contacts');
+const { router: peopleRoutes } = require('./routes/people');
 const coursesRoutes = require('./routes/courses');
 const gamesRoutes = require('./routes/games');
 const adminRoutes = require('./routes/admin');
@@ -17,7 +17,7 @@ app.set('trust proxy', 1);
 app.use(express.json());
 
 app.use(authRoutes);
-app.use(contactsRoutes);
+app.use(peopleRoutes);
 app.use(coursesRoutes);
 app.use(gamesRoutes);
 app.use(adminRoutes);

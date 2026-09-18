@@ -18,7 +18,7 @@ import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import AdminUsersScreen from './src/screens/AdminUsersScreen';
-import AdminUserFriendsScreen from './src/screens/AdminUserFriendsScreen';
+import AdminUserEditScreen from './src/screens/AdminUserEditScreen';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { colors } from './src/theme';
 
@@ -61,7 +61,7 @@ function AppNavigator() {
         {user ? (
           <>
             <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Friends" component={FriendsScreen} options={{ title: 'Friends' }} />
+            <Stack.Screen name="Friends" component={FriendsScreen} options={{ title: 'People' }} />
             <Stack.Screen name="Courses" component={CourseListScreen} options={{ title: 'Courses' }} />
             <Stack.Screen
               name="CourseEdit"
@@ -98,9 +98,9 @@ function AppNavigator() {
                   options={{ title: 'Manage Users' }}
                 />
                 <Stack.Screen
-                  name="AdminUserFriends"
-                  component={AdminUserFriendsScreen}
-                  options={({ route }) => ({ title: `${route.params.userName}'s Friends` })}
+                  name="AdminUserEdit"
+                  component={AdminUserEditScreen}
+                  options={{ title: 'Edit Person' }}
                 />
               </>
             )}
